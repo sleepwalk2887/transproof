@@ -177,19 +177,9 @@ $('#c-docmode').addEventListener('change', () => {
    专有译词库（3.0）
    数据流：导入文件 → 解析候选词条 → 归一化合并 → 审核 → 入库 → 导出/同步
    ═══════════════════════════════════════════════════════════════ */
-const LS_GLOSS = 'tp.gloss';
-const GLOSS_DEF = { version: 2, sources: [], terms: [], tags: [], rules: [], log: [], collections: [] };
-let GLOSS = load(LS_GLOSS, GLOSS_DEF);
-if(!GLOSS.terms) GLOSS.terms = []; if(!GLOSS.sources) GLOSS.sources = []; if(!GLOSS.collections) GLOSS.collections = [];
-
-/* v4.0 Prompt 库（翻译风格指令库 + 评分学习） */
-const LS_PROMPTS = 'tp.prompts';
-const PROMPTS_DEF = { version: 1, prompts: [] };
-let PROMPTS = load(LS_PROMPTS, PROMPTS_DEF);
-if(!PROMPTS.prompts) PROMPTS.prompts = [];
+/* GLOSS / PROMPTS 数据声明已提升到 01-core.js（避免 02/03 加载即引用时 ReferenceError） */
 function savePrompts(){ save(LS_PROMPTS, PROMPTS); }
 function newPromptId(){ return 'p_' + Date.now() + '_' + Math.floor(Math.random()*1000); }
-if(!GLOSS.tags) GLOSS.tags = []; if(!GLOSS.rules) GLOSS.rules = []; if(!GLOSS.log) GLOSS.log = [];
 function saveGloss(){ save(LS_GLOSS, GLOSS); }
 function glossLog(action, target, before, after){
   GLOSS.log.unshift({ t: Date.now(), action, target, before: before||null, after: after||null });

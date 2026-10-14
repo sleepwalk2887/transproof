@@ -11,12 +11,13 @@
 
 - 定位：把「外文原文 + 中文译文」交给 AI，逐句对照，揪出漏译/误译/翻译腔，统一术语、规范格式、给出可粘贴的注释。
 - 目标用户：文科翻译 / 学术译者（用户本人是文科生，看重「省事、省 token、术语一致」）。
-- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.25.1，见第八节第 4 条发布方式）
-- 当前版本：**v4.25.1**
+- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.25.2，见第八节第 4 条发布方式）
+- 当前版本：**v4.25.2**
 
 ## 二、技术栈（很轻，别怕）
 
-- **模块化纯前端（v4.25.1 起拆分）**：`transproof/index.html`（约 1600 行）只留 HTML + CSS，全部原生 JS 按加载顺序拆成 `transproof/js/01-core.js ～ 10-app-init.js` 十个模块（classic script 顺序加载，顶层变量跨文件共享，行为与原单文件完全一致）；改代码前先读第七节测试方式，改动必须过全量 29 项。
+- **模块化纯前端（v4.25.1 起拆分）**：`transproof/index.html`（约 1600 行）只留 HTML + CSS，全部原生 JS 按加载顺序拆成 `transproof/js/01-core.js ～ 10-app-init.js` 十个模块（classic script 顺序加载，行为与原单文件完全一致）；改代码前先读第七节测试方式，改动必须过全量 29 项。
+  - ⚠️ **拆分红线（v4.25.2 线上回归教训）**：classic script **无跨文件提升**——在先模块（02/03…）不能在加载阶段引用后模块的顶层变量，**包括 `setTimeout(fn,…)` 这类回调**（100ms 也可能早于后模块执行）。所有跨模块共享的数据声明（`GLOSS`/`PROMPTS`/`CFG`/`TERMS` 等 `let/const`）必须前置到 `js/01-core.js`，后模块只放函数。
 - 无构建、无框架、无后端。数据全部存在浏览器 `localStorage`。
 - 调用 LLM：OpenAI 兼容接口（`CFG.baseUrl + '/chat/completions'`），SSE 流式（`Authorization: Bearer CFG.apiKey`）。默认 DeepSeek。
 - 外部 CDN 库（按需懒加载，均带多源兜底 jsdelivr+unpkg，pdf.js 另有 bootcdn/staticfile）：mammoth（docx 读）、pdf.js + tesseract.js（PDF/OCR）、JSZip（docx 写）、docx（导出 Word）、OpenCC（繁简转换）、XLSX（Excel）。
@@ -38,7 +39,7 @@ project-memory/
 ├── 2026-10-10.md     # 开发日志（v4.17.0 术语集合 / v4.18.0 质量预估 / v4.19.0 联网查证 / v4.20.0 词条批量管理）
 └── 2026-10-11.md     # 开发日志（v4.21.0 Swiss×NASA-punk 融合 UI 改造）
     ├── 2026-10-12.md     # 开发日志（v4.21.1 CDN 多源兜底 / v4.21.2 扫描件 OCR 语言包同源修复 / v4.21.3 换行修复 / v4.22.0 PDF 注释识别 / v4.23.0 P2 多模型 + P1 模糊匹配与修订模式）
-    └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造 + v4.25.1 模块化拆分）
+    └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造 + v4.25.1 模块化拆分 + v4.25.2 效果演示卡）
 ```
 
 ## 四、核心架构（关键函数锚点）
@@ -99,6 +100,7 @@ project-memory/
 
 - **v4.25.0** UI 融合改造（依据 UI-DESIGN-BRIEF.md，Swiss 栅格×屋顶现视研×纸墨朱印）：①**四层分区字体系统** --f-ui/--f-read/--f-mono/--f-quote（全系统栈零下载，删 Google Fonts 外链；结果区与大文本框 16px/1.8/.02em；计数器/正则框/开屏 .sp-deco 等接 --f-mono + tabular-nums；导出 Word 换 IBM Plex Serif+思源宋体栈）；②**4px 栅格**（_sweep4.js 清扫 margin/padding/gap 至 4 倍数，non-4px=0，.wrap 1500→1200px、卡片间距 24px、body 14→13px）；③**hairline --bd**（暗 rgba(237,232,216,.12)/亮 rgba(27,26,22,.15)）+ **明暗双字重** --fw-strong/--fw-title（暗 500/600、亮 600/700，约 30 处接线）+ 9/10px→11px；④**单字类型标签** 危/检/术/议（#out li[data-err]::before content:attr(data-tag)，markErrorLines 写 dataset.tag；.g-col::before='术'）；⑤**开屏零时长变化**——.7s/.12/.26/.42/.58s 全部换成 --sp-dur/--sp-d1..d4 变量（值逐毫秒复刻），字体接驳，动画逻辑一字未动。禁区全保（--bg/#d63a2c/--r:2px/--sh:none/八标签/id）。验收 7 项全过，全量 **29/29 全绿**（两轮）
 - **v4.25.1** L1 架构拆分（零逻辑改动）：index.html 7035 → 1606 行，JS 全部切成 `js/01-core ～ 10-app-init` 十模块按序加载；唯一跨文件提升陷阱 `onclick = openCollectionPicker`（定义落 09 号文件）改惰性箭头；`_check.js` 升级为内联 + js/*.js 逐文件 node --check，`_verify-ui.js` 适配拆分后验收 7/7，全量 **29/29 两轮全绿**；**部署包必须带 js/ 目录**（deploy.sh 已补），版本号移至 `js/01-core.js:2`
+- **v4.25.2** 使用指南「效果演示」卡（T-003）：帮助页「30 秒了解」后插入演示卡——双按钮切换「校对前·你贴进来的」/「校对后·它返给你的」，同屏对比英文原文 + 三处病译 → 修订后译文（err/ac 标色）+ 三条带 危/术/议 方章的批注 + 「顺手记住」；新内联 `tpDemo()` 只做显隐切换，全部新 id（dm-*），零旧锚点改动、纯前端零依赖。`_probe-demo.js` 实测卡片序位 1/13、双向切换、t-tag×3、亮暗截图清晰、**0 报错**；全量 **29/29 全绿**。版本号 `js/01-core.js:2` = 4.25.2
 
 ## 七、测试方式
 

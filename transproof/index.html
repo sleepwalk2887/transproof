@@ -1313,6 +1313,61 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
   </div>
 
   <div class="card">
+    <h3>效果演示：校对前后，30 秒看懂它干什么</h3>
+    <div class="body">
+      <p style="font-size:14px;line-height:2;margin-bottom:12px">
+        下面是一段<b>真实比例的示例</b>（英译中，三处典型毛病）。点按钮切换「校对前 / 校对后」：
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn sm pri" id="dm-btn-a" onclick="tpDemo('a')">👀 校对前：你贴进来的</button>
+        <button class="btn sm" id="dm-btn-b" onclick="tpDemo('b')">✨ 校对后：它返给你的</button>
+      </div>
+
+      <div id="dm-before">
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:12px">
+          <div class="hint" style="margin-bottom:8px">原文（英文）</div>
+          <div style="font-size:15px;line-height:1.8">In 1884 the committee decided to table the motion; hegemony remained the official term in all later reports.</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:16px">
+          <div class="hint" style="margin-bottom:8px">你的译文（还没校对——毛病看不出来，对吧？）</div>
+          <div style="font-size:15px;line-height:1.8">1884 年，委员会决定把这个动议摆到桌上；霸权主义仍然是之后所有报告中的官方用语。</div>
+        </div>
+      </div>
+
+      <div id="dm-after" style="display:none">
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:12px">
+          <div class="hint" style="margin-bottom:8px">① 修订后译文（改好的部分标了色）</div>
+          <div style="font-size:15px;line-height:1.8">1884 年，委员会决定将该动议<span style="color:var(--err);font-weight:600">搁置</span>；此后所有报告均沿用<span style="color:var(--ac);font-weight:600">「霸权」</span>这一官方术语。</div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:16px;margin-bottom:12px">
+          <div class="hint" style="margin-bottom:8px">② 批注：每条开头挂方章，先救哪条一眼看出</div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.7">
+            <div><span class="t-tag" style="color:var(--err)">危</span><b>误译：</b>table 在议事务境里是「搁置」，不是「摆到桌上」——已替你改好</div>
+            <div><span class="t-tag" style="color:var(--ac)">术</span><b>术语不一致：</b>hegemony 你定过译「霸权」，这里却译成「霸权主义」——已统一；决策面板还能一键入库，全文生效</div>
+            <div><span class="t-tag" style="color:var(--warn)">议</span><b>语体：</b>后半句被动堆叠读着绕——已收紧为「此后所有报告均沿用…」</div>
+          </div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:16px">
+          <div class="hint" style="margin-bottom:8px">③ 它还会顺手记住</div>
+          <div style="font-size:13.5px;line-height:1.7">术语库与翻译记忆自动更新——同样的错<b>下次不会再犯</b>；改动可一键导回原文 Word（修订痕迹逐条接受或拒绝）。</div>
+        </div>
+      </div>
+
+      <div class="alert i" style="margin-top:16px">
+        <b>一句话：</b>你只管贴，它负责改好 + 说明白 + 记住。看完这里就可以接着下面的「<b>第一次使用：跟着做，只要 3 步</b>」，跑通你的第一遍。
+      </div>
+    </div>
+  </div>
+  <script>
+  function tpDemo(which){
+    document.getElementById('dm-before').style.display = which === 'a' ? '' : 'none';
+    document.getElementById('dm-after').style.display  = which === 'b' ? '' : 'none';
+    document.getElementById('dm-btn-a').classList.toggle('pri', which === 'a');
+    document.getElementById('dm-btn-b').classList.toggle('pri', which === 'b');
+  }
+  </script>
+
+  <div class="card">
     <h3>它到底是怎么工作的？（想用得放心，建议读一遍）</h3>
     <div class="body">
       <div class="alert i" style="margin-bottom:14px">

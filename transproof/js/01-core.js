@@ -1,5 +1,5 @@
 /* ═══════════ 配置与状态 ═══════════ */
-const APP_VERSION = '4.25.1'; // 全局版本号：TransProof.version 与 #g-version 标签共用
+const APP_VERSION = '4.25.2'; // 全局版本号：TransProof.version 与 #g-version 标签共用
 const LS = {
   cfg:'tp.cfg', terms:'tp.terms', prefs:'tp.prefs', history:'tp.history', memory:'tp.memory'
 };
@@ -218,3 +218,16 @@ function fireHook(name, val, extra){
   }catch(e){ console.warn('钩子 ' + name + ' 执行出错，已忽略：', e); }
   return val;
 }
+
+/* ═══════ 跨模块共享数据（必须在此声明：02/03 在加载时即引用，classic script 无跨文件提升，后定义会 ReferenceError） ═══════ */
+/* 译词库 GLOSS */
+const LS_GLOSS = 'tp.gloss';
+const GLOSS_DEF = { version: 2, sources: [], terms: [], tags: [], rules: [], log: [], collections: [] };
+let GLOSS = load(LS_GLOSS, GLOSS_DEF);
+if(!GLOSS.terms) GLOSS.terms = []; if(!GLOSS.sources) GLOSS.sources = []; if(!GLOSS.collections) GLOSS.collections = [];
+if(!GLOSS.tags) GLOSS.tags = []; if(!GLOSS.rules) GLOSS.rules = []; if(!GLOSS.log) GLOSS.log = [];
+/* Prompt 库 PROMPTS */
+const LS_PROMPTS = 'tp.prompts';
+const PROMPTS_DEF = { version: 1, prompts: [] };
+let PROMPTS = load(LS_PROMPTS, PROMPTS_DEF);
+if(!PROMPTS.prompts) PROMPTS.prompts = [];
