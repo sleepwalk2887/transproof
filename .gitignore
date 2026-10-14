@@ -1,0 +1,18 @@
+# 凭证与本地配置（永不入库）
+.env
+*.env
+.transproof-deploy/
+
+# 构建产物 / 缓存 / 备份
+_stage/
+.wrangler/
+node_modules/
+*.bak
+
+# 本地测试临时文件
+_verify.png
+_bak.json
+
+# 系统文件
+Thumbs.db
+.DS_Store

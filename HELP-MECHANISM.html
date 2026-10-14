@@ -1,0 +1,104 @@
+<!-- ══════════════════════════════════════════════════════════════════
+     给 dsh 的插入说明（复制代码时不要把这段说明一起复制进 index.html）
+
+     插入位置：index.html 中，<section class="page" id="p-help"> 内，
+     第一个 card（标题「这是个什么工具？（30 秒了解）」）的 </div></div>
+     结束之后、「第一次使用：跟着做，只要 3 步」这个 card 之前。
+     —— 即 1314 行 <div class="card"> 之前。
+
+     插入方式：整段原文粘贴，不要改写。
+     样式类（card / h3 / body / table / alert i / alert w / steps / step / code）
+     全部沿用帮助页现有样式，无需新增任何 CSS。
+     纯静态 HTML，不含 JS，不会影响任何功能与测试。
+
+     插入后请：跑全量测试确认 29/29 全绿，然后 bash publish.sh 发布。
+     ══════════════════════════════════════════════════════════════════ -->
+
+  <div class="card">
+    <h3>它到底是怎么工作的？（想用得放心，建议读一遍）</h3>
+    <div class="body">
+      <div class="alert i" style="margin-bottom:14px">
+        <b>先说最重要的一句：</b>这个工具<b>自己不会翻译，也不会判断对错</b>。它做的是——把你的要求整理成一份极其详细的「说明书」，交给大模型，再把回话整理好递给你。真正读句子、找问题、给改译的，是你在设置里填的那个大模型（DeepSeek / GPT / Claude 等）。<b>它是一个极其讲究的「下单员」：你下的单越清楚，回的货越好。</b>
+      </div>
+
+      <p style="font-size:14px;line-height:1.9;margin-bottom:10px"><b>一次校对，背后只有五步：</b></p>
+      <div class="steps">
+        <div class="step"><div><b>第 1 步 · 你填。</b> 原文、译文，加上语种、文体、目标读者、术语库、临时要求……</div></div>
+        <div class="step"><div><b>第 2 步 · 它拼。</b> 把你填的这一切，拼成一份十层结构的指令（见下表）。这一步是它唯一真正干的活。</div></div>
+        <div class="step"><div><b>第 3 步 · 它发。</b> 把指令和你的文本打包，一次性发给大模型接口。</div></div>
+        <div class="step"><div><b>第 4 步 · 模型生成。</b> 这一步是<b>唯一的黑箱</b>——谁也看不见它怎么想，包括写这个工具的人。</div></div>
+        <div class="step"><div><b>第 5 步 · 它整理。</b> 收回来，折叠批注、按 <code>[误译]</code> 这类标记做分类统计、挑出争议词让你点选，并把「原文 → 定稿译文」的句对自动存进翻译记忆，下次遇到同样的句子就不再重翻。</div></div>
+      </div>
+
+      <p style="font-size:14px;line-height:1.9;margin:14px 0 8px"><b>你填的每一项，最后去了哪里：</b></p>
+      <table>
+        <thead><tr><th style="width:30%">你在界面上填的</th><th style="width:26%">在指令里变成</th><th>起什么作用</th></tr></thead>
+        <tbody>
+          <tr><td>语种 / 文体 / 目标读者 / 风格</td><td>任务参数段</td><td>决定它用什么口气、什么深度去改</td></tr>
+          <tr><td>术语库</td><td>「必须无条件遵守」的强制译名表（最多 300 条）</td><td>保证全书译名统一，不符就改并注明</td></tr>
+          <tr><td>全局风格偏好</td><td>「优先级高于通则」段</td><td>你的习惯压过默认规则</td></tr>
+          <tr><td>本次特别指示</td><td>「最高优先级」段</td><td>临时要求压过一切</td></tr>
+          <tr><td>勾选的争议点 / 注释 / 标点 / 去机器腔</td><td>各自独立的规则段</td><td>决定它额外操心哪些事</td></tr>
+          <tr><td>翻译记忆（自动）</td><td>三档参考：原样保留 / 微调复用 / 仅供参考</td><td>同一句话不翻第二遍，保持前后一致</td></tr>
+          <tr><td>（固定）七条校对准则</td><td>忠实优先、术语一致、不越界等</td><td>兜住底线，防止它自由发挥</td></tr>
+          <tr><td>（固定）输出格式要求</td><td>必须输出「修订后译文 + 逐条批注 + …」</td><td>让结果能被程序自动解析和统计</td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:14px;line-height:1.9;margin:14px 0 8px"><b>为什么要分「一校」和「二校」？</b>因为一次让模型干两件事，它会顾此失彼。所以拆成两次独立运行：</p>
+      <table>
+        <thead><tr><th style="width:18%"></th><th style="width:44%">只管什么</th><th>明令禁止</th></tr></thead>
+        <tbody>
+          <tr><td><b>一校</b></td><td>硬伤：漏译、增译、误译、术语不一致、歧义、逻辑关系、数字日期</td><td>不许润色文风</td></tr>
+          <tr><td><b>二校</b></td><td>文风：去机器腔、优化中文表达、统一语体与标点</td><td>不许改动语义与术语译名</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:14px;line-height:1.9;margin-top:10px">先「改对」，再「改好」——这是它设计上最讲究的一处。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>能放心吗？三道保险、三层边界与已知局限</h3>
+    <div class="body">
+      <p style="font-size:14px;line-height:1.9;margin-bottom:8px"><b>它内置了三道保险，替你盯着质量：</b></p>
+      <table>
+        <thead><tr><th style="width:24%">保险</th><th style="width:46%">它做什么</th><th>你要做什么</th></tr></thead>
+        <tbody>
+          <tr><td><b>校对前质量预估</b></td><td>正式动手前先快速扫一眼，给出 0–100 分、等级、问题最集中的段落、以及建议先做一校还是二校</td><td>看一眼，决定用哪个深度</td></tr>
+          <tr><td><b>术语硬注入</b></td><td>术语表直接写进指令，译文不符就改正并注明「按术语表统一」</td><td>把术语库填扎实</td></tr>
+          <tr><td><b>疑难句标注</b></td><td>最多挑 8 处真正影响理解的地方，给出候选译法、推荐项和<b>把握度（高 / 中 / 低）</b>——<b>只提议，绝不擅自改写</b></td><td><b>由你拍板</b>；标「低」的务必自己核一遍</td></tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:14px;line-height:1.9;margin:14px 0 8px"><b>说句实话：黑箱到底在哪一层？</b></p>
+      <table>
+        <thead><tr><th style="width:38%">环节</th><th style="width:14%">状态</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>参数怎么填、术语怎么注入、格式怎么要求、结果怎么解析</td><td><b>白箱</b></td><td>完全可查可控，你说了算</td></tr>
+          <tr><td>十条指令里哪条起了作用、它为什么这么判断</td><td><b>灰箱</b></td><td>无法精确归因</td></tr>
+          <tr><td>模型内部的推理过程</td><td><b>黑箱</b></td><td>谁都看不见，包括写这个工具的人</td></tr>
+        </tbody>
+      </table>
+      <div class="alert i" style="margin-top:12px">
+        <b>所以准确的说法是：</b>工具不是黑箱，模型才是。这个工具做的全部事情，是把黑箱的<b>输入</b>尽量规范化、可复现、可约束——它提高的是「下单质量」，而不是消除不确定性。<b>最后签字的人，始终是你。</b>
+      </div>
+
+      <p style="font-size:14px;line-height:1.9;margin:14px 0 8px"><b>已知局限（必须知道）：</b></p>
+      <div class="alert w">
+        <div>· 结果的格式靠「约定」而非程序强制，模型偶尔不守规矩，个别条目可能没被统计到——重要稿件请自己扫一遍原文对照。</div>
+        <div>· 模型有可能<b>编造译法的出处</b>。指令里已明令「不得编造、不确定须明确声明」，但这只能压制、不能根除。</div>
+        <div>· 校对是<b>整篇一次发送</b>，超长文本可能被截断，建议按章分批。</div>
+        <div>· 设置里的「温度」参数越高，模型越发散；做严谨校对建议调低。</div>
+        <div>· 术语表<b>最多注入 300 条</b>，超出的本次不生效。</div>
+      </div>
+
+      <p style="font-size:14px;line-height:1.9;margin:14px 0 8px"><b>想让它更准，按收益从高到低做这五件事：</b></p>
+      <div class="steps">
+        <div class="step"><div><b>① 把术语库填扎实。</b> 这是收益最高的一件事——术语是唯一被「强制」执行的部分，其余都是建议。</div></div>
+        <div class="step"><div><b>② 在「全局风格偏好」里写清你的固定要求。</b> 它的优先级高于默认通则，一次写好后每次都生效。</div></div>
+        <div class="step"><div><b>③ 关键稿子走完整流程：</b>一校 → 二校 → 精修。别指望一步到位。</div></div>
+        <div class="step"><div><b>④ 长文按章分批</b>，别一次塞一整本书。</div></div>
+        <div class="step"><div><b>⑤ 疑难句标注里标「把握度：低」的条目</b>，务必自己核一遍——那是模型自己都没底的判断。</div></div>
+      </div>
+    </div>
+  </div>

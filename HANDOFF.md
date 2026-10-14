@@ -1,0 +1,169 @@
+# 译校助手 · 项目交接文档（HANDOFF）
+
+> 这是一份给接手者（AI 助手 / 开发者）的完整上下文说明。
+> 读完本文件 + `project-memory/` 目录下的记忆日志，即可无缝接手本项目继续开发。
+
+---
+
+## 一、项目是什么
+
+**译校助手（Translation Proofreader）** —— 一个纯前端的 AI 翻译校对工具。
+
+- 定位：把「外文原文 + 中文译文」交给 AI，逐句对照，揪出漏译/误译/翻译腔，统一术语、规范格式、给出可粘贴的注释。
+- 目标用户：文科翻译 / 学术译者（用户本人是文科生，看重「省事、省 token、术语一致」）。
+- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.25.0，见第八节第 4 条发布方式）
+- 当前版本：**v4.25.0**
+
+## 二、技术栈（很轻，别怕）
+
+- **单文件纯前端**：整个应用几乎都在 `transproof/index.html`（约 5000 行）里，HTML + 原生 JS + CSS 变量。
+- 无构建、无框架、无后端。数据全部存在浏览器 `localStorage`。
+- 调用 LLM：OpenAI 兼容接口（`CFG.baseUrl + '/chat/completions'`），SSE 流式（`Authorization: Bearer CFG.apiKey`）。默认 DeepSeek。
+- 外部 CDN 库（按需懒加载，均带多源兜底 jsdelivr+unpkg，pdf.js 另有 bootcdn/staticfile）：mammoth（docx 读）、pdf.js + tesseract.js（PDF/OCR）、JSZip（docx 写）、docx（导出 Word）、OpenCC（繁简转换）、XLSX（Excel）。
+- `config.js` 是「安全修改区」：用户可改模板/配色/钩子，主程序不动。
+
+## 三、文件结构
+
+```
+transproof/
+├── index.html        # 主程序（核心，几乎一切都在这里）
+├── config.js         # 外部配置（提示词模板、配色、钩子，用户可改）
+├── tests/            # 29 个 Playwright 测试（01～29）
+├── 乱风企划tips.md    # 取经笔记 + 功能进化清单（借鉴 GitHub / BelinDoc 的路线图）
+└── _verify.png       # 测试截图（可忽略）
+project-memory/
+├── 2026-09-24.md     # 开发日志（v4.2.1 → v4.7.1）
+├── 2026-10-07.md     # 开发日志（v4.8.0 → v4.16.0）
+├── 2026-10-09.md     # 开发日志（v4.16.1 全量自检 + 修复 10 隐患）
+├── 2026-10-10.md     # 开发日志（v4.17.0 术语集合 / v4.18.0 质量预估 / v4.19.0 联网查证 / v4.20.0 词条批量管理）
+└── 2026-10-11.md     # 开发日志（v4.21.0 Swiss×NASA-punk 融合 UI 改造）
+    ├── 2026-10-12.md     # 开发日志（v4.21.1 CDN 多源兜底 / v4.21.2 扫描件 OCR 语言包同源修复 / v4.21.3 换行修复 / v4.22.0 PDF 注释识别 / v4.23.0 P2 多模型 + P1 模糊匹配与修订模式）
+    └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造）
+```
+
+## 四、核心架构（关键函数锚点）
+
+页面顶部 8 个页签：校对工作台 / 翻译工作台 / 项目进度 / 术语库 / 专有译词库 / Prompt库 / 设置 / 使用指南。
+
+| 函数 | 作用 |
+|---|---|
+| `run()` | 校对主流程（`extOnly`=仅术语延伸） |
+| `tsRun()` | 翻译主流程 |
+| `buildSystem()` | 拼装校对系统提示词（规则/术语表/偏好/翻译记忆注入） |
+| `callModel(sys, user, onDelta, which)` | SSE 流式调用 LLM |
+| `callModelSimple()` | 非流式调用（关键词提取、反推提示词用） |
+| `md()` | 轻量 Markdown 渲染 |
+| `makeStreamRenderer(el)` | 流式渲染节流（纯文本，防卡顿） |
+| `collapseSections()` | 把批注/注释/争议折叠成 `<details>` |
+| `termAudit()` / `showTermAudit()` | 术语一致性体检（本地零成本） |
+| `parseEdits()` / `showEditDiff()` | 改动对照视图 |
+| `learnFromResult()` / `findMemoryMatches()` | 翻译记忆（本地句对复用） |
+| `syncToProject()` | 校对结果同步到项目看板 |
+| `parseFile()` | 文件解析（docx/pdf/图片 OCR） |
+| `buildTransSystem()` | 翻译系统提示词 |
+| `renderDecisionPanel()` | 术语争议点选面板 |
+
+**全局状态**：`CFG`（配置）、`TERMS`（术语库）、`PREFS`（偏好）、`PROJECT`（项目看板）、`TM`（翻译记忆）、`STAGE`（校对阶段 full/pass1/pass2）、`THEME`/`ACCENT`（主题）。
+
+## 五、localStorage 数据（共 13 个 key）
+
+`tp.cfg` `tp.terms` `tp.prefs` `tp.history` `tp.memory` `tp.project` `tp.prompts` `tp.gloss` `tp.task` `tp.stage` `tp.theme` `tp.accent` `tp.splash`
+
+→ 备份/恢复逻辑在 `#btn-backup` / `#btn-restore`（v2 完整备份，13 项全打包成 JSON；备份测试断言 13 类）。
+
+## 六、已实现功能清单（按版本）
+
+- **v4.2.1** 决策面板（术语争议点选 + 一键应用重校）
+- **v4.3.0** PDF 逐页 OCR / 从原文反推提示词 / 原文导出 docx
+- **v4.4.0** 字数上限可配 / 复制可选段落 / 断点续传
+- **v4.5.0–4.7.1** 智能配图助手（关键词→跳转搜索）/ 项目进度看板（导出导入 JSON 协作）/ 导航布局修复
+- **v4.8.0** 术语一致性自动体检（本地零成本）
+- **v4.9.0** 一校/二校双阶段 + 批注错误分类筛选 + 一键修改 + 看板信息共享
+- **v4.10.0** 明暗主题自适应 + 自定义主题色
+- **v4.11.0** 流式渲染节流（防崩溃）+ 区块折叠 + 注释可粘贴尾注格式
+- **v4.12.0** 改动对照视图（P1，零 token）
+- **v4.13.0** 流式纯文本渲染（修火狐卡顿）
+- **v4.14.0** 进度条 + 暂停/续写 + 翻译记忆（P1）+ 精修模式修复
+- **v4.15.0** 理顺 tone/style 重叠 + 自动术语体检 + 一校自动二校
+- **v4.16.0** 完整备份迁移能力（12 key）
+- **v4.17.0** 术语「集合」+ LLM 智能扫描：从 PDF/DOC/TXT 智能抽取术语并自动按集合收纳（剔除标题/目录/页眉等噪声，高置信度自动确认、低置信度留待审核）；翻译/校对时可选取集合锁定术语；打通术语库与专有译词库入口
+- **v4.18.0** 校对前「质量预估」：正式校对前用很少 token 快速扫一眼，给出译文水平评分/等级、问题集中段落、建议一校还是二校（借鉴 qe4pe/divemt 工作量预估）
+- **v4.19.0** 争议术语联网查证：译词库术语行加「🔎 查证」按钮，一键跳转 Google Scholar / 百度学术 / CNKI / 维基百科 检索该术语通行译法（纯前端跳转，零 token、零依赖）；另加「集合筛选」下拉，可按集合查看术语（UI 优化）
+- **v4.20.0** 词条批量管理/删除补全：批量栏改为常显（未勾选禁用、勾选启用，解决「找不到批量入口」）；术语行加「🗑」单条删除；补上「⇄ 合并所选」按钮事件（此前缺失）；loadLib 加 10 秒超时兜底（修复 CDN 库加载失败时 onerror 不触发导致的扫描流程卡死）
+- **v4.21.0** Swiss×NASA-punk 融合 UI 改造（全站）：Swiss 骨架（网格/左对齐/平涂/细线/编号）+ NASA 点缀（面板/标签/彩条/徽章/等宽）克制融合；NASA 手册配色（暗墨黑 / 亮米灰 #ECE5D6 + 强调红 #D63A2C）；字体换 Space Grotesk 硬朗无衬线；四色复古彩条页首 + 圆形任务徽章 + 卡片四角铆钉 + 黑白警示斜纹 + UNIT 编号标签，铺开全站卡片
+- **v4.21.1** CDN 多源兜底 + PDF 解析修复：修「无法解读 pdfjs」报错——根因所有库只依赖 jsdelivr 单一 CDN（大陆被墙）。给全部 15 处 loadLib 加第二源 unpkg，pdf.js 加到 4 源（jsdelivr+unpkg+bootcdn+staticfile），pdf worker 换 BootCDN 国内源；测试断言过滤 CDN 兜底时首个源失败产生的 `Failed to load resource` 浏览器噪音
+- **v4.21.2** 扫描件 OCR 修复（「解析失败undefined」）：根因 tesseract 的 worker/core/lang 三个内部路径仍硬编码 jsdelivr，v4.21.1 的多源只救了主脚本——worker 死 → reject `event.message`=undefined（即用户看到的 undefined）；lang 死 → 静默挂起卡 95%。修复：`tpTessPaths` 三路探测（unpkg→npmmirror→jsdelivr，HEAD 验证 MIME）选可达 worker/core；**语言包 chi_sim/eng.traineddata.gz 落到应用同源目录**（零 CDN、最快、不被墙）；`tpRecognize` 加 240s 看门狗防永久挂起 + errorHandler 防 pageerror；`errMsg` 兜底杜绝 undefined 文案；进度回调「下载OCR内核/语言包/初始化/识别中」上 fileBar
+- **v4.21.3** 换行修复（「复制进 doc 保留格式仍不断行」）：根因两层——① `parsePdf` 文本层 `join(' ')` 把整页拍成一行（源 PDF 换行全丢，OCR 路径反而保 `\n`）；② 普通模式提示词无段落硬约束，AI 默认拍平多段。修复：`pdfTextLines` 按 Y 坐标分组还原行 + 字符过滤放行 `\n`；`buildSystem` 非文档模式注入【结构保持】硬约束（换行与分段必须与待校对译文一致、禁合并段落）。复制链路本身无损（剪贴板探针实测 HTML flavor 4 个 `<p>`、plain 含 `\r\n`）
+- **v4.22.0** PDF 注释识别 + 翻译 + 按需贴入：整书 PDF 自动提取文中数字标号脚注与正文后尾注（pdfLineObjs 行聚簇/字号差识别上标标号、页底分隔线识别脚注块、H_END/H_STOP 标题识别尾注起止、编号递增收条目）；「🏷 本章注释」弹窗按章/标号/页码取注释，批量翻译（NOTE_SYS JSON）后三选一贴入译文尾（仅译文/仅原文/双语，防重复贴入，可移除）；buildSystem 注入【注释标号】原样保留约束；notes 随任务持久化。测试 `tests/24-notes.js` 27 断言，全量 24/24 全绿
+- **v4.23.0** P2 多模型预设 + P1 两项收尾：①设置页服务商下拉扩为 **24 家**（国内 14 含小米 MiMo flash/pro、海外 8、聚合 2）按组动态生成，选中即回填接口地址与模型名，修掉「自定义」项两处老 bug（value 不匹配致回填字面 custom / 不回显）与尾斜杠预设回显问题；②翻译记忆模糊匹配双档（simScore bigram 余弦：≥0.90 近似命中微调复用 / 0.80–0.90 相关参考禁照抄 / 以下不注入，精确命中去重）；③导回 Word 修订模式：`#btn-trackdoc` 逐段 LCS 词级 diff 生成 `w:del/w:ins` 修订痕迹（作者 TransProof、w:id 递增、settings 开 trackChanges、pPr/rPr 保留），Word 审阅页可逐条接受/替换模式不受影响；另修 mammoth 缓存命中时 `window.mammoth` 不存在的隐患。测试 `25/26/27` 三件套，全量 **27/27 全绿**
+
+- **v4.25.0** UI 融合改造（依据 UI-DESIGN-BRIEF.md，Swiss 栅格×屋顶现视研×纸墨朱印）：①**四层分区字体系统** --f-ui/--f-read/--f-mono/--f-quote（全系统栈零下载，删 Google Fonts 外链；结果区与大文本框 16px/1.8/.02em；计数器/正则框/开屏 .sp-deco 等接 --f-mono + tabular-nums；导出 Word 换 IBM Plex Serif+思源宋体栈）；②**4px 栅格**（_sweep4.js 清扫 margin/padding/gap 至 4 倍数，non-4px=0，.wrap 1500→1200px、卡片间距 24px、body 14→13px）；③**hairline --bd**（暗 rgba(237,232,216,.12)/亮 rgba(27,26,22,.15)）+ **明暗双字重** --fw-strong/--fw-title（暗 500/600、亮 600/700，约 30 处接线）+ 9/10px→11px；④**单字类型标签** 危/检/术/议（#out li[data-err]::before content:attr(data-tag)，markErrorLines 写 dataset.tag；.g-col::before='术'）；⑤**开屏零时长变化**——.7s/.12/.26/.42/.58s 全部换成 --sp-dur/--sp-d1..d4 变量（值逐毫秒复刻），字体接驳，动画逻辑一字未动。禁区全保（--bg/#d63a2c/--r:2px/--sh:none/八标签/id）。验收 7 项全过，全量 **29/29 全绿**（两轮）
+
+## 七、测试方式
+
+```bash
+cd transproof
+node serve.js                       # 起本地服务（python 不可用，自写 node 静态服务器）
+node tests/14-backup.js             # 跑某个测试（需 playwright-core）
+```
+
+- 测试用 Edge headless（`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`）。
+- playwright-core 在 `C:/Users/Andrew/.workbuddy/binaries/node/workspace/node_modules/playwright-core`。
+- node 用 `C:/Program Files/nodejs/node.exe`（v24.21.0）。
+- 已知 flaky：全量回归连续跑 14 个测试，末尾测试偶发卡住（浏览器资源），单独重跑即过，非产品 bug。
+
+## 八、关键约定（务必遵守）
+4. **【发版收尾铁律，用户 2026-10-14 指定（m04369）】** 每次功能更新 + 版本 bump 之后，除非用户提前另说，必须完成「自检 + 两份文档」：
+   - 自检：`node _check.js`（bad=0）→ UI 改版轮加 `_verify-ui.js` → `node run-all.js` 全量（需先起 `node serve.js`，浏览器测试要 danger-full-access）→ bump 后**复跑一遍全量**；
+   - 两份文档：①更新 index.html 的 `#p-help` 使用指南（本次新功能/新界面写成白话说明）；②更新 `transproof\乱风企划tips.md`（已上线表加行 + 计数、状态与 Top 清单）；
+   - 然后才是三副本同步 → _stage → wrangler 发布 → 线上验证，答复带约定提醒（看 tips + 「革命尚未成功，同志仍需努力」）。
+
+1. **术语一致性是用户最核心的诉求**，所有功能都围绕"省事 + 术语统一 + 省 token"。
+2. 用户是文科生，功能要"零基础能懂、一键能用"，别搞复杂交互。
+3. 用户偏好：结构化输出、表格、emoji 标记、多角度全面讲解。
+4. **发布上线（重要，已改为自主发布）**：本项目已迁移到 **Cloudflare Pages** 托管，**不再依赖 WorkBuddy 的 `workbuddy_sites_deploy`**。
+   ⚠️ **每次改完代码，立即执行一次发布（不要攒着、不要等下次）**。
+   改完代码后，在本工作区直接执行：
+   ```bash
+   bash publish.sh
+   ```
+   或全路径：`bash ~/.transproof-deploy/deploy.sh`
+   ⚠️ 本机若无 Git Bash（实测 2026-10-12 无 bash），可直接用 node 跑本机 wrangler：
+   `C:\Users\Andrew\.workbuddy\binaries\node\versions\22.22.2-6\node.exe` 运行
+   `...\node_modules\wrangler\bin\wrangler.js pages deploy <stage> --project-name=transproof --branch=main --commit-dirty=true`，
+   stage 目录里放 index.html + config.js 即可；凭证走 OAuth（token 留空）。
+   若要强制发布本工作区里这份：
+   ```bash
+   bash ~/.transproof-deploy/deploy.sh "$(pwd)/transproof"
+   ```
+   - 线上地址：**https://transproof.pages.dev**（链接固定，每次更新不变）
+   - **智能选源**：不指定目录时，脚本会比较 WorkBuddy 副本与本工作区副本的修改时间，
+     自动发布**较新**的那份；发布成功后会把这份**回写**到另一处，两边始终一致
+     （加 `--no-sync` 关闭回写；`--dry-run` 只演练不上传）
+   - **凭证已配置完毕，可直接使用。** 身份方式是 `wrangler login` 的 OAuth 授权
+     （凭据在 `C:\Users\Andrew\AppData\Roaming\xdg.config\.wrangler\config\default.toml`），
+     Account ID 已写在 `~/.transproof-deploy/env`。**没有手工建 API Token，也不需要建。**
+     若将来提示授权失效：跑 `bash ~/.transproof-deploy/wrangler-login.sh` 重新授权一次。
+   - wrangler 4.149.0 已装在本机（`~/.workbuddy/binaries/node/versions/22.22.2-6/`），
+     脚本优先用它，**不会**联网下载；Cloudflare API 连通性已实测通过
+   - 上传 `index.html`、`config.js`，以及** OCR 语言包 `chi_sim.traineddata.gz` + `eng.traineddata.gz`（v4.21.2 起必带，放同一 stage 目录，否则线上 OCR 回落 jsdelivr 又被墙）**；测试/备份/文档不上传
+   - 旧链接 `https://transproof.app.workbuddy.host/` 已停止更新（保留最后一次内容作归档）
+
+## 九、下一步方向（待办）
+
+> 📌 **用户约定（务必遵守）**：用户要求每次完成一个请求后，都提醒他看 `乱风企划tips.md` 的未竟目标清单，并提醒「**革命尚未成功，同志仍需努力**」——持续用这份清单鞭策推进，别做完一件事就"收工忘事"。
+
+**长期目标清单**（详见 `乱风企划tips.md`，含 GitHub / BelinDoc 取经结论）：
+
+| 优先级 | 功能 | 可行度 |
+|---|---|---|
+| 🥈 P2 | 修订对照三栏逐句视图（现在是改动片段对照） | 中 |
+| 🥈 P2 | 三段流水线（翻译→批评→精修） | 中 |
+| 🥉 P3 | 使用指南加「效果演示」 | 高 |
+| 🥉 P3 | 团队审校留痕 / 真·云端协作 | 低（大工程，暂缓）|
+
+> ✅ 已完成：P1 导回 Word 修订模式（v4.23.0）、P1 翻译记忆模糊匹配（v4.23.0）、P2 多模型预设（v4.23.0）、3 秒开屏/工具栏分组/疑难标注（v4.24.0）。
+
+## 十、关于"对话记录"
+
+本项目原在 WorkBuddy 平台开发。完整的开发决策、版本演进、踩坑记录已浓缩在 `project-memory/` 的多个 md 日志里（按时间记录了每个版本改了什么、为什么、坑在哪）。接手时先读最新的 `project-memory/2026-10-14.md`，再往前读 `2026-10-12.md`（v4.21.1-4.23.0）`2026-10-11.md`（v4.21.0 UI 改造）→ `2026-10-10.md`（v4.17-4.20 术语/预估/查证/批量）→ `2026-10-09.md`（v4.16.1 自检）→ `2026-10-07.md` → `2026-09-24.md`（早期）。
