@@ -1,0 +1,8 @@
+name = "transproof-feedback"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# KV 存反馈列表（binding 名与 src/index.js 中 env.FB_KV 一致）
+kv_namespaces = [
+  { binding = "FB_KV", id = "f22d5e2a5b65492998567f95610be463" }
+]

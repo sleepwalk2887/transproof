@@ -85,6 +85,7 @@ async function tpTessPaths(){
 async function tpRecognize(image, onOcrProgress){
   await loadLib('Tesseract', [
     'https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js',
+    'https://registry.npmmirror.com/tesseract.js/5.1.0/files/dist/tesseract.min.js',
     'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js'
   ]);
   const p = await tpTessPaths();
@@ -148,6 +149,7 @@ async function parseDocx(file, onProgress){
   if(onProgress) onProgress('加载 mammoth…', 0.1);
   // 用 loadLib 返回值（缓存命中时 window.mammoth 可能不存在）
   const mammoth = await loadLib('mammoth', [
+    'https://registry.npmmirror.com/mammoth/1.8.0/files/mammoth.browser.min.js',
     'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
     'https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js'
   ]);
@@ -322,6 +324,7 @@ function markersIn(text){
 async function parsePdf(file, onProgress){
   if(onProgress) onProgress('加载 pdf.js…', 0.05);
   await loadLib('pdfjs', [
+    'https://registry.npmmirror.com/pdfjs-dist/3.11.174/files/build/pdf.min.js',
     'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
     'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js',
     'https://cdn.bootcdn.net/ajax/libs/pdf.js/3.11.174/pdf.min.js',
@@ -330,7 +333,7 @@ async function parsePdf(file, onProgress){
   // 配置 worker（pdfjs 3.x 用 pdfjsLib 全局）
   if(!window.pdfjsLib.GlobalWorkerOptions.workerSrc){
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdn.bootcdn.net/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      'https://registry.npmmirror.com/pdfjs-dist/3.11.174/files/build/pdf.worker.min.js';
   }
   if(onProgress) onProgress('读取 PDF…', 0.2);
   const buf = await file.arrayBuffer();
