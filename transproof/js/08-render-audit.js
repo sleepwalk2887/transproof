@@ -990,7 +990,14 @@ function applyProofEdit(fp, oldTxt, newTxt){
   const m = LAST_OUT.match(re);
   let ok = false;
   if(m && m[0].indexOf(oldTxt) >= 0){
-    LAST_OUT = LAST_OUT.slice(0, m.index) + m[0].replace(oldTxt, newTxt) + LAST_OUT.slice(m.index + m[0].length);
+    // Word 式「相同错误」处理：段内还有 N 处一样的旧译，问一次是否全部替换
+    const rest = m[0].split(oldTxt).length - 2;
+    let sec = m[0];
+    if(rest > 0 && confirm('修订段里还有 ' + rest + ' 处相同的「' + oldTxt + '」，全部替换为「' + newTxt + '」？')){
+      sec = sec.split(oldTxt).join(newTxt);
+    }
+    sec = sec.replace(oldTxt, newTxt);
+    LAST_OUT = LAST_OUT.slice(0, m.index) + sec + LAST_OUT.slice(m.index + m[0].length);
     ok = true;
   }
   if(!ok) toast('结果文本里没找到原句，已按显示更新（重跑校对会以模型输出为准）', 'w');
@@ -1039,3 +1046,92 @@ function applyProofEdit(fp, oldTxt, newTxt){
     applyProofEdit(sp.dataset.fp, orig, nv);
   });
 })();
+
+/* ═══════════ 专名一致性体检（v4.28.0，本地零流量，参考 Okapi TermChecker 思路自研） ═══════════ */
+function proNounAudit(outText, srcText){
+  const F = []; outText = String(outText || ''); srcText = String(srcText || '');
+  const nz = s => s.replace(/\s+/g, '');
+  // ① 同名异译：「中文名（Latin）」括号绑定，同一外文名对应多种中文译法
+  const bind = {};
+  const reB = /([一-龥·]{2,14})[（(]([A-Z][A-Za-zÀ-ÿ.'’\- ]{1,40}?)[）)]/g;
+  let m;
+  while((m = reB.exec(outText))){
+    const k = nz(m[2]).toLowerCase();
+    (bind[k] = bind[k] || new Set()).add(nz(m[1]));
+  }
+  Object.keys(bind).forEach(k => {
+    const s = bind[k];
+    if(s.size > 1){
+      const v = [...s];
+      F.push({ t: '同名异译', ev: v.join(' / '), d: '同一原文名「' + k + '」在译文里对应 ' + s.size + ' 种不同译法', sugg: v, fixable: true });
+    }
+  });
+  // ② 疑似未译：原文明有的外文多词专名，译文里仍是裸原文（且不在括号里）
+  if(srcText){
+    const bareRe = /(?<![A-Za-zÀ-ÿ])([A-ZÀ-Þ][a-zà-ÿ'’]+(?:\s+[A-ZÀ-Þ][a-zà-ÿ'’]+)+)(?![a-zà-ÿ])/g;
+    const srcL = new Set((srcText.match(bareRe) || []).map(nz));
+    const bare = {}; let mm;
+    while((mm = bareRe.exec(outText))){
+      const before = outText[mm.index - 1] || '';
+      if(before === '（' || before === '(') continue;
+      bare[mm[1]] = (bare[mm[1]] || 0) + 1;
+    }
+    Object.keys(bare).forEach(k => {
+      if(srcL.has(nz(k))) F.push({ t: '疑似未译', ev: k, d: '原文明有这个词，译文里还是原文（出现 ' + bare[k] + ' 次），可能漏译或没附中文译名', fixable: false });
+    });
+    // ③ 数字对不上：原文里 ≥3 位的数字（年份/数据）在译文里找不到（中文邻接也算边界）
+    const numSet = s => new Set((s.match(/(?<![\d,.])\d[\d,.]{0,12}(?![\d,.])/g) || []).filter(n => n.replace(/[,.]/g, '').length >= 3));
+    const ns = numSet(srcText), no = numSet(outText); let c = 0;
+    ns.forEach(n => {
+      if(!no.has(n) && c < 8){ c++; F.push({ t: '数字对不上', ev: n, d: '原文有 ' + n + '，译文里找不到（可能漏译或被改动）', fixable: false }); }
+    });
+  }
+  return F.slice(0, 20);
+}
+function pnOpen(){
+  if(!LAST_OUT){ toast('还没有校对结果', 'w'); return; }
+  const F = __TP_FILES.src || __TP_FILES.dst;
+  const list = proNounAudit(LAST_OUT, F ? F.fullText : '');
+  if(!list.length){ modal('🔎 专名体检', '<div class="alert i">没发现明显的专名 / 数字不一致——本地零流量检查完成。</div>'); return; }
+  let html = '<div class="alert i" style="margin-bottom:10px">本地零流量核对（同名异译 / 疑似未译 / 数字丢失）。可统一的选一种译法点「统一」，其余点「跳过」。</div>';
+  list.forEach((f, i) => {
+    html += '<div style="border:1px solid var(--bd);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">' +
+      '<div style="font-weight:var(--fw-strong)"><span class="t-tag" style="border-color:var(--warn);color:var(--warn)">' + esc(f.t) + '</span> ' + esc(f.ev) + '</div>' +
+      '<div style="font-size:12px;color:var(--tx2);margin-top:4px">' + esc(f.d) + '</div>';
+    if(f.fixable){
+      html += '<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        f.sugg.map((z, j) => '<label style="font-size:12px"><input type="radio" name="pn-' + i + '" value="' + esc(z) + '"' + (j === 0 ? ' checked' : '') + '> ' + esc(z) + '</label>').join('') +
+        '<button class="btn pri sm" data-pn-unify="' + i + '">统一为所选</button></div>';
+    } else {
+      html += '<div style="margin-top:6px"><button class="btn gray sm" data-pn-skip="' + i + '">跳过</button></div>';
+    }
+    html += '</div>';
+  });
+  modal('🔎 专名体检 · ' + list.length + ' 条', html);
+  $$('#mBody [data-pn-unify]').forEach(b => {
+    b.onclick = () => {
+      const i = +b.dataset.pnUnify;
+      const sel = $('#mBody input[name="pn-' + i + '"]:checked');
+      if(!sel) return;
+      const keep = sel.value;
+      let n = 0;
+      list[i].sugg.forEach(z => {
+        if(z === keep) return;
+        const c = LAST_OUT.split(z).length - 1;
+        if(c){ n += c; LAST_OUT = LAST_OUT.split(z).join(keep); }
+      });
+      if(!n){ toast('没有找到其它译法', 'w'); return; }
+      $('#out').innerHTML = md(LAST_OUT);
+      collapseSections(); markErrorLines(); renderAuditControls(); paintErrFixSpans();
+      saveTask();
+      const box = b.closest('div[style]');
+      if(box) box.style.opacity = .45;
+      b.disabled = true; b.textContent = '✓ 已统一（' + n + ' 处）';
+      toast('已统一为「' + keep + '」（' + n + ' 处）');
+    };
+  });
+  $$('#mBody [data-pn-skip]').forEach(b => {
+    b.onclick = () => { b.disabled = true; b.textContent = '已跳过'; const box = b.closest('div[style]'); if(box) box.style.opacity = .45; };
+  });
+}
+$('#btn-pnoun') && ($('#btn-pnoun').onclick = pnOpen);

@@ -253,6 +253,10 @@ label.f{display:block;font-size:12px;color:var(--tx2);margin-bottom:4px;font-wei
 /* ---------- 统计 ---------- */
 /* ---------- 单字类型标签（屋顶现视研式：分类别、颜色表级别，11px mono + 1px 边框 + 直角） ---------- */
 .t-tag{display:inline-block;font-family:var(--f-mono);font-size:11px;line-height:1.4;padding:0 4px;margin-right:8px;border:1px solid currentColor;border-radius:0;vertical-align:1px;letter-spacing:0}
+.eb-wrap{margin:0 0 12px}
+.eb-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.eb-bar input{padding:8px 12px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg);color:var(--tx);font-family:var(--f-mono);font-size:12px}
+.eb-ta{width:100%;min-height:340px;font-family:var(--f-read);font-size:16px;line-height:var(--lh-body);padding:20px;border:1px solid var(--bd);border-radius:var(--r);background:var(--bg);color:var(--tx);resize:vertical}
 /* 结果区批注条目：按错误类别上色（--err 危 / --warn 检议 / --ac 术），不引入新颜色 */
 #out li[data-err]{position:relative}
 #out li[data-err]:not([data-err=""])::before{content:attr(data-tag);display:inline-block;font-family:var(--f-mono);font-size:11px;line-height:1.4;padding:0 4px;margin-right:8px;border:1px solid currentColor;border-radius:0;vertical-align:1px}
@@ -328,18 +332,18 @@ td input:focus,td select:focus{background:var(--bg3);border-color:var(--ac)}
 .stage-btn.on{background:var(--grad-ac);color:#fff;font-weight:var(--fw-strong)}
 .ef-chip{padding:4px 12px;border-radius:14px;border:1px solid var(--bd2);background:var(--bg3);font-size:11.5px;cursor:pointer;transition:.15s;color:var(--tx2);white-space:nowrap}
 /* P2/P3 批注修正闭环（v4.26.0）：已修标记 + 译文标红 + 内联修正 */
-.ef-fix-btn{margin-left:8px;padding:0 6px;font-size:11px;border:1px solid var(--bd2);border-radius:2px;background:var(--bg3);color:var(--tx3);cursor:pointer;white-space:nowrap;transition:.15s}
+.ef-fix-btn{margin-left:8px;padding:0 8px;font-size:11px;border:1px solid var(--bd2);border-radius:2px;background:var(--bg3);color:var(--tx3);cursor:pointer;white-space:nowrap;transition:.15s}
 .ef-fix-btn:hover{border-color:var(--ok);color:var(--tx2)}
 .ef-fix-btn.on{background:rgba(63,185,80,.14);border-color:var(--ok);color:var(--ok-tx)}
 li.ef-done{opacity:.75}
-li.ef-done::after{content:'✓ 已修';float:right;font-size:11px;color:var(--ok-tx);background:rgba(63,185,80,.14);border:1px solid var(--ok);padding:0 6px;border-radius:2px;margin-left:8px}
+li.ef-done::after{content:'✓ 已修';float:right;font-size:11px;color:var(--ok-tx);background:rgba(63,185,80,.14);border:1px solid var(--ok);padding:0 8px;border-radius:2px;margin-left:8px}
 .ef-progress{font-size:11.5px;color:var(--tx3);margin-left:8px;white-space:nowrap}
-.err-fix{background:rgba(214,58,44,.16);border-bottom:1.5px solid var(--err);padding:0 2px;cursor:text;border-radius:2px}
+.err-fix{background:rgba(214,58,44,.16);border-bottom:1.5px solid var(--err);padding:0 4px;cursor:text;border-radius:2px}
 .err-fix.editing{background:rgba(63,185,80,.12);border-bottom-color:var(--ok);outline:none;box-shadow:0 0 0 2px rgba(63,185,80,.25)}
 /* P1 收录核查结果弹窗（v4.26.0） */
-.vf-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bd)}
+.vf-row{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bd)}
 .vf-row:last-child{border-bottom:none}
-.vf-badge{flex:none;font-size:11px;padding:1px 8px;border:1px solid var(--bd2);border-radius:2px}
+.vf-badge{flex:none;font-size:11px;padding:4px 8px;border:1px solid var(--bd2);border-radius:2px}
 .vf-badge.ok{background:rgba(63,185,80,.14);border-color:var(--ok);color:var(--ok-tx)}
 .vf-badge.doubt{background:rgba(210,153,34,.15);border-color:var(--warn);color:var(--warn-tx)}
 .vf-badge.bad{background:rgba(248,81,73,.15);border-color:var(--err);color:var(--err-tx)}
@@ -705,6 +709,7 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
       <button class="btn gray sm" id="btn-notes" title="从 PDF 自动提取的脚注/尾注：可批量翻译、按章节勾选贴入校对结果（v4.22.0）">🏷 本章注释</button>
       <button class="btn gray sm" id="btn-img" title="从校对结果提取关键词，为文章检索配图">🔍 配图</button>
       <button class="btn gray sm" id="btn-audit" title="本地扫描：检查术语是否前后统一、术语库译法是否被遵守（不调 AI、不花 token）">🩺 术语体检</button>
+      <button class="btn gray sm" id="btn-pnoun" title="本地零流量核对专名一致性：同名异译/疑似未译/数字丢失，可一键统一（v4.28.0）">🔎 专名体检</button>
       <button class="btn gray sm" id="btn-diff" title="把批注整理成「原译 → 修订」对照表：红色删除线、绿色高亮，逐条可复制（不调 AI、不花 token）">📝 改动对照</button>
     </span>
     <span class="tb-sep"></span>
@@ -715,7 +720,7 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
   </div>
 
   <div class="card">
-    <h3>③ 校对结果 <span class="hint" id="outHint">等待运行</span></h3>
+    <h3>③ 校对结果 <span class="hint" id="outHint">等待运行</span> <button class="btn gray sm" id="btn-out-edit" title="编辑结果：查找替换、全部替换、改完保存即重渲（v4.28.0）">✏️ 编辑/替换</button></h3>
     <div id="post-bar">
       <div id="err-filter" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
       <div id="stage-next" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
@@ -1024,7 +1029,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 
   <!-- ③ 译文输出 -->
   <div class="card step-3">
-    <h3><span class="step-num">3</span>译文输出 <span class="hint" id="ts-outHint">等待运行</span></h3>
+    <h3><span class="step-num">3</span>译文输出 <span class="hint" id="ts-outHint">等待运行</span> <button class="btn gray sm" id="btn-ts-edit" title="编辑译文：查找替换、全部替换、改完保存即重渲（v4.28.0）">✏️ 编辑/替换</button></h3>
     <div class="body">
       <div id="ts-progress-wrap" style="display:none;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:var(--bg2);border:1px solid var(--bd);border-radius:8px">
         <div class="progress-track"><div class="progress-bar" id="ts-progress-bar"></div></div>
@@ -1550,6 +1555,11 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>📋 改动对照</b></td><td>一眼看出 AI 改了哪几处、改成啥，零 token</td></tr>
           <tr><td><b>📤 复制 / 转公众号 /  Markdown</b></td><td>结果三种去向：纯修订稿（可勾选段落）、公众号富文本、Markdown</td></tr>
           <tr><td><b>📥 导出校对后 Word / 导回修订模式</b></td><td>见上一张卡片「文档模式」</td></tr>
+          <tr><td><b>🤖 核查（v4.27 新）</b></td><td>术语库/译词库/决策面板里问 AI「这个选项收录得对吗」——好选项一键采用入库，坏选项打回，错误选项不再混进可选项</td></tr>
+          <tr><td><b>☑ 标记已修（v4.27 新）</b></td><td>每条批注可标「已修」：顶部出现「未修 N」筛选与「已修 x/N」进度，提醒闭环——报了的问题一个个划掉，不只报不管</td></tr>
+          <tr><td><b>✏ 译文里标红就地改（v4.27 新）</b></td><td>批注对应位置的修订译文会标红，点一下直接编辑、回车生效——改错不用再跑一遍校对</td></tr>
+          <tr><td><b>🔎 专名体检（v4.28 新）</b></td><td>一键本地体检（不花 token）：人名、历史事件等专有名词的「同名异译 / 疑似未译 / 数字对不上」三类问题一次抓出，弹窗里选统一译法、一键全局替换</td></tr>
+          <tr><td><b>✏ 编辑/替换（v4.28 新）</b></td><td>校对结果和翻译输出都能直接编辑：像 Word 一样查找、替换、全部替换（显示找到几处），改完「保存并重渲」立即生效；也可放弃修改还原</td></tr>
         </tbody>
       </table>
       <div class="alert i" style="margin-top:12px">
@@ -1722,5 +1732,6 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 <script src="js/09-gloss.js"></script>
 <script src="js/10-app-init.js"></script>
 <script src="js/11-feedback.js"></script>
+<script src="js/12-editbox.js"></script>
 </body>
 </html>
