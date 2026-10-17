@@ -141,7 +141,7 @@ function renderTerms(){
       '<td><input value="' + esc(t.dst) + '" data-k="dst"></td>' +
       '<td><select data-k="cat">' + CATS.map(c => '<option' + (c===t.cat?' selected':'') + '>' + c + '</option>').join('') + '</select></td>' +
       '<td><input value="' + esc(t.note||'') + '" data-k="note"></td>' +
-      '<td><button class="btn gray sm" data-del>删除</button></td></tr>';
+      '<td style="white-space:nowrap"><button class="btn gray sm" data-verify title="AI 核查这条收录是否正确（v4.26.0）">🤖 核查</button> <button class="btn gray sm" data-del>删除</button></td></tr>';
   }).join('');
   tb.querySelectorAll('tr').forEach(tr => {
     const i = +tr.dataset.i;
@@ -150,6 +150,18 @@ function renderTerms(){
     });
     tr.querySelector('[data-del]').onclick = () => {
       TERMS.splice(i, 1); save(LS.terms, TERMS); renderTerms();
+    };
+    tr.querySelector('[data-verify]').onclick = async () => {
+      const t = TERMS[+tr.dataset.i]; if(!t) return;
+      const items = [{ src: t.src, dst: t.dst, extra: t.cat || '' }];
+      const vs = await verifyEntries(items, tr.querySelector('[data-verify]'));
+      if(!vs) return;
+      showVerifyResults(items, vs, { onAdopt: (k, v) => {
+        if(!v.suggest) return false;
+        t.dst = v.suggest; save(LS.terms, TERMS); renderTerms();
+        toast('已把「' + t.src + '」的译法改为建议值');
+        return true;
+      }});
     };
   });
 }

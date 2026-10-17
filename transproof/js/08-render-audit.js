@@ -37,15 +37,18 @@ function renderErrorFilter(text){
   const seg = $('#err-filter');
   if(!keys.length){ seg.innerHTML = ''; return false; }
   const total = keys.reduce((a,k) => a + cats[k], 0);
+  const fpLis = [...document.querySelectorAll('#out li[data-fp]')].filter(li => li.dataset.err);
+  const doneN = fpLis.filter(li => AUDIT_FIX[li.dataset.fp]).length;
   seg.innerHTML = '<span style="font-size:12px;color:var(--tx3)">错误分类：</span>' +
     '<button class="ef-chip on" data-ef="all">全部 ' + total + '</button>' +
-    keys.map(k => '<button class="ef-chip" data-ef="' + esc(k) + '">' + esc(k) + ' ' + cats[k] + '</button>').join('');
+    keys.map(k => '<button class="ef-chip" data-ef="' + esc(k) + '">' + esc(k) + ' ' + cats[k] + '</button>').join('') +
+    (fpLis.length ? '<button class="ef-chip" data-ef="unfixed">未修 ' + (fpLis.length - doneN) + '</button><span class="ef-progress">已修 ' + doneN + '/' + fpLis.length + '</span>' : '');
   seg.querySelectorAll('.ef-chip').forEach(ch => ch.onclick = () => {
     seg.querySelectorAll('.ef-chip').forEach(x => x.classList.remove('on'));
     ch.classList.add('on');
     const v = ch.dataset.ef;
     document.querySelectorAll('#out li').forEach(li => {
-      const hit = (v === 'all') || (li.dataset.err === v);
+      const hit = (v === 'all') || (v === 'unfixed' ? !!(li.dataset.err && !AUDIT_FIX[li.dataset.fp]) : (li.dataset.err === v));
       li.style.opacity = hit ? '1' : '0.3';
       li.style.background = (hit && v !== 'all') ? 'rgba(79,140,255,.08)' : 'transparent';
       if(hit && v !== 'all'){ const d = li.closest('details'); if(d) d.open = true; }
@@ -245,6 +248,7 @@ function renderDecisionPanel(text){
       ).join('') +
       '<div class="dp-foot">' +
         '<button class="btn pri sm" id="dp-apply">▶ 应用所选并重新校对</button>' +
+        '<button class="btn sm" id="dp-verify" title="AI 逐词核查当前选中的译法是否正确，坏译法标出并可一键换成建议值（v4.26.0）">🤖 核查选项</button>' +
         '<button class="btn sm" id="dp-importall" title="点选过的用点选译法，没点选的用推荐译法，全部写入术语库">📥 一键全部入术语库</button>' +
         '<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tx2);cursor:pointer"><input type="checkbox" id="dp-tolib" checked style="width:auto">选中的同时入术语库</label>' +
         '<span class="dp-hint">未选的组保持现状不改动</span>' +
@@ -263,6 +267,38 @@ function renderDecisionPanel(text){
     $('#dp-apply').textContent = n ? '▶ 应用所选（' + n + ' 项）并重新校对' : '▶ 应用所选并重新校对';
   };
   updateDpCount();
+  // P1 收录核查（v4.26.0）：逐词核查当前选中（或推荐）译法，坏译法可一键换成建议值
+  $('#dp-verify').onclick = async () => {
+    const items = pts.map((p, i) => {
+      const item = panel.querySelectorAll('.dp-item')[i];
+      const sel = item && item.querySelector('.dp-chip.sel');
+      return { src: p.term, dst: sel ? sel.dataset.val : (p.rec || '') };
+    }).filter(x => x.dst);
+    if(!items.length){ toast('没有可核查的译法', 'w'); return; }
+    const vs = await verifyEntries(items, $('#dp-verify'));
+    if(!vs) return;
+    showVerifyResults(items, vs, {
+      note: '采用后该词自动换成建议译法并选中，再点「应用所选并重新校对」生效。',
+      onAdopt: (k, v) => {
+        if(!v.suggest) return false;
+        const item = panel.querySelectorAll('.dp-item')[k];
+        if(!item) return false;
+        const holder = item.querySelector('.dp-chip') ? item.querySelector('.dp-chip').parentElement : item;
+        const chip = document.createElement('span');
+        chip.className = 'dp-chip sel'; chip.dataset.val = v.suggest; chip.textContent = v.suggest;
+        item.querySelectorAll('.dp-chip').forEach(x => x.classList.remove('sel'));
+        chip.onclick = () => {
+          const was = chip.classList.contains('sel');
+          item.querySelectorAll('.dp-chip').forEach(x => x.classList.remove('sel'));
+          if(!was) chip.classList.add('sel');
+        };
+        holder.appendChild(chip);
+        updateDpCount();
+        toast('已换成建议译法：' + v.suggest);
+        return true;
+      }
+    });
+  };
   // 一键全部入术语库：点选过的用点选译法，未点选的用推荐译法
   $('#dp-importall').onclick = () => {
     const recMap = {}; pts.forEach(p => recMap[p.term] = p.rec || '');
@@ -788,3 +824,218 @@ function modal(title, html){
 function closeModal(){ $('#modal').classList.remove('on'); }
 $('#mClose').onclick = () => $('#modal').classList.remove('on');
 $('#modal').onclick = e => { if(e.target.id === 'modal') $('#modal').classList.remove('on'); };
+
+/* ═══════════ P1 收录正确性核查（v4.26.0 · AI 查询审核）═══════════
+   三问题之一：自动收录会把错误选项也拾取入库。此模块给三处入口
+   （术语库行 / 词库行 / 决策面板），AI 判 正确/存疑/错误 + 给建议译法，
+   采纳与否由你拍板——AI 只报告不动手。判定依据来源：(待补充：判定依据来源) */
+const VERIFY_SYS = '你是术语收录核查员。给定一组「原文词 → 已收录译法」，逐条判定这条收录是否正确。' +
+  '判定标准：译法是否为该词在此类别/语境下通行、准确的中文对应；宁可存疑，不硬判；绝不编造出处。' +
+  '只输出 JSON 数组，每项：{"i":序号,"verdict":"ok|doubt|bad","reason":"≤40字依据","suggest":"更通行的译法，没有就空字符串","conf":"high|mid|low"}。';
+async function verifyEntries(items, btn){
+  if(!CFG.apiKey){ toast('先去「设置」填好模型 Key 再核查', 'w'); return null; }
+  const old = btn ? btn.innerHTML : '';
+  if(btn) btn.innerHTML = '<span class="spin"></span>核查中…';
+  try{
+    const user = '【待核查收录】\n' + items.map((x, i) =>
+      '[' + i + '] ' + (x.src || '—') + ' → ' + (x.dst || '—') + (x.extra ? '（' + x.extra + '）' : '')).join('\n');
+    const r = await callModelSimple(VERIFY_SYS, user, 1400);
+    const arr = extractJsonArray(r && r.text ? r.text : '');
+    if(!arr.length){ toast('模型没返回结构化结果，稍后再试', 'w'); return null; }
+    return arr;
+  }catch(e){ toast('核查失败：' + errMsg(e), 'w'); return null; }
+  finally{ if(btn) btn.innerHTML = old; }
+}
+function showVerifyResults(items, verdicts, opts){
+  const VMAP = { ok:{cls:'ok',t:'✓ 正确'}, doubt:{cls:'doubt',t:'? 存疑'}, bad:{cls:'bad',t:'✗ 错误'} };
+  const rows = items.map((it, i) => {
+    const v = verdicts.find(x => +x.i === i) || {};
+    const m = VMAP[v.verdict] || { cls:'doubt', t:'? 未判定' };
+    const sug = String(v.suggest || '').trim();
+    return '<div class="vf-row" data-i="' + i + '">' +
+      '<span class="vf-badge ' + m.cls + '">' + m.t + '</span>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:13px"><b>' + esc(it.src || '—') + '</b> → ' + esc(it.dst || '—') + '</div>' +
+        '<div style="font-size:12.5px;color:var(--tx2);margin-top:2px">' + esc(v.reason || '（模型没给依据）') + '</div>' +
+        (sug && v.verdict !== 'ok' ? '<div style="font-size:12.5px;margin-top:2px">建议改为：<b style="color:var(--ac)">' + esc(sug) + '</b>' +
+          ((opts && opts.onAdopt) ? ' <button class="btn sm" data-adopt style="vertical-align:middle">✓ 采用</button>' : '') + '</div>' : '') +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--tx3)">置信 ' + esc(v.conf || '?') + '</span>' +
+    '</div>';
+  }).join('');
+  modal('🤖 收录核查结果',
+    '<div style="font-size:12.5px;color:var(--tx2);margin-bottom:6px">AI 判定仅供参考，采纳前自己再过目一眼。' + (opts && opts.note ? esc(opts.note) : '') + '</div>' + rows);
+  if(opts && opts.onAdopt){
+    $$('#mBody [data-adopt]').forEach(b => b.onclick = () => {
+      const i = +b.closest('.vf-row').dataset.i;
+      const v = verdicts.find(x => +x.i === i) || {};
+      if(!opts.onAdopt(i, v)) return;
+      b.textContent = '✓ 已采用'; b.disabled = true;
+    });
+  }
+}
+
+/* ═══════════ P2+P3 批注「已修/未修」流转 + 译文标红内联修正（v4.26.0）═══════════
+   三问题之二/三：误译提醒只报告不闭环 →
+   P2：每条批注带「标记已修」按钮，状态随任务持久化，筛选条出现「未修 N」与「已修 x/N」；
+   P3：批注里的「改为『新译』」定位到修订后译文段标红，点击直接改，改完自动写回结果并标已修。 */
+function auditParseLi(li){
+  const txt = (li.textContent || '').replace(/\s+/g, ' ').trim();
+  const m = txt.match(/^\s*[\[【]([^\]】]{2,8})[\]】]\s*(.*)$/);
+  const type = m && ERR_TYPES.includes(m[1].trim()) ? m[1].trim() : (li.dataset.err || '');
+  const body = m ? m[2] : txt;
+  const fm = body.match(/\*\*([^*]+?)\*\*\s*→/) || body.match(/^(.+?)\s*→/);
+  const xm = body.match(/改为\s*[「"'](.+?)[」"']/);
+  const frag = ((fm && fm[1]) || '').trim();
+  const fix = ((xm && xm[1]) || '').trim();
+  return { type: type, frag: frag, fix: fix, fp: type + '|' + frag + '|' + fix };
+}
+function renderAuditControls(){
+  const out = $('#out'); if(!out) return;
+  out.querySelectorAll('li[data-err]').forEach(li => {
+    if(!li.dataset.err) return;
+    const a = auditParseLi(li);
+    if(!a.fp || a.fp === '|' || a.fp === '||') return;
+    li.dataset.fp = a.fp;
+    let btn = li.querySelector('.ef-fix-btn');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.className = 'ef-fix-btn';
+      btn.type = 'button';
+      li.appendChild(btn);
+    }
+    const done = !!AUDIT_FIX[a.fp];
+    btn.textContent = done ? '✓ 已修' : '标记已修';
+    btn.classList.toggle('on', done);
+    li.classList.toggle('ef-done', done);
+    btn.onclick = (ev) => { ev.stopPropagation(); toggleAuditFix(a.fp, li, btn); };
+  });
+  updateFixProgress();
+}
+function toggleAuditFix(fp, li, btn){
+  if(AUDIT_FIX[fp]) delete AUDIT_FIX[fp]; else AUDIT_FIX[fp] = 1;
+  const done = !!AUDIT_FIX[fp];
+  btn.textContent = done ? '✓ 已修' : '标记已修';
+  btn.classList.toggle('on', done);
+  li.classList.toggle('ef-done', done);
+  saveTask();
+  updateFixProgress();
+}
+function updateFixProgress(){
+  const seg = $('#err-filter'); if(!seg) return;
+  const lis = [...document.querySelectorAll('#out li[data-fp]')].filter(li => li.dataset.err);
+  const done = lis.filter(li => AUDIT_FIX[li.dataset.fp]).length;
+  let p = seg.querySelector('.ef-progress');
+  if(!lis.length){ if(p) p.remove(); const c = seg.querySelector('[data-ef="unfixed"]'); if(c) c.remove(); return; }
+  if(!p){ p = document.createElement('span'); p.className = 'ef-progress'; seg.appendChild(p); }
+  p.textContent = '已修 ' + done + '/' + lis.length;
+  const chip = seg.querySelector('[data-ef="unfixed"]');
+  if(chip) chip.textContent = '未修 ' + (lis.length - done);
+}
+function paintErrFixSpans(){
+  const out = $('#out'); if(!out) return;
+  // 1) 清旧痕（把 span 还原成文本节点，内容原样）
+  out.querySelectorAll('.err-fix').forEach(s => {
+    s.replaceWith(document.createTextNode(s.textContent));
+  });
+  // 2) 定位「修订后译文」区间（md() 把所有标题渲染为 h4）
+  const h4s = [...out.children].filter(n => n.tagName === 'H4');
+  const start = h4s.find(h => /(修订后译文|修订稿|终稿|定稿)/.test(h.textContent));
+  if(!start) return;
+  const nodes = [];
+  let el = start.nextElementSibling;
+  while(el && el.tagName !== 'H4'){ nodes.push(el); el = el.nextElementSibling; }
+  if(!nodes.length) return;
+  // 3) 每条带「改为『新译』」的批注 → 在区间里定位并标红（只包第一处）
+  const seen = {};
+  out.querySelectorAll('li[data-err]').forEach(li => {
+    if(!li.dataset.err) return;
+    const a = auditParseLi(li);
+    if(!a.fix || a.fix.length < 2) return;
+    if(seen[a.fp]) return;
+    seen[a.fp] = 1;
+    wrapFixSpan(nodes, a.fix, a.fp, a.frag);
+  });
+}
+function wrapFixSpan(nodes, text, fp, frag){
+  const cands = [text, text.slice(0, 16)].filter(x => x && x.length >= 2);
+  for(const root of nodes){
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n;
+    while((n = walker.nextNode())){
+      for(const c of cands){
+        const i = n.nodeValue.indexOf(c);
+        if(i >= 0){
+          const after = n.splitText(i);
+          after.splitText(c.length);
+          const span = document.createElement('span');
+          span.className = 'err-fix';
+          span.dataset.fp = fp;
+          span.dataset.frag = frag || '';
+          span.textContent = c;
+          span.title = 'AI 建议的新译：点击可直接修改';
+          after.parentNode.insertBefore(span, after);
+          after.remove();
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+function applyProofEdit(fp, oldTxt, newTxt){
+  if(!newTxt){ toast('译文不能为空，已还原', 'w'); paintErrFixSpans(); return; }
+  // 在 LAST_OUT 的「修订后译文」段里替换第一处旧译
+  const re = /(?:^|\n)(#{1,4}\s*[^\n]*(?:修订后译文|修订稿|终稿|定稿)[^\n]*\n)([\s\S]*?)(?=\n#{1,4}\s|$)/;
+  const m = LAST_OUT.match(re);
+  let ok = false;
+  if(m && m[0].indexOf(oldTxt) >= 0){
+    LAST_OUT = LAST_OUT.slice(0, m.index) + m[0].replace(oldTxt, newTxt) + LAST_OUT.slice(m.index + m[0].length);
+    ok = true;
+  }
+  if(!ok) toast('结果文本里没找到原句，已按显示更新（重跑校对会以模型输出为准）', 'w');
+  AUDIT_FIX[fp] = 1;
+  saveTask();
+  const out = $('#out');
+  out.innerHTML = md(LAST_OUT);
+  collapseSections();
+  renderDecisionPanel(LAST_OUT);
+  markErrorLines();
+  renderAuditControls();
+  renderErrorFilter(LAST_OUT);
+  renderPostBar();
+  paintErrFixSpans();
+  toast('已修正 ✓ 该条批注自动标为「已修」');
+}
+(function bindErrFixEdit(){
+  const out = $('#out');
+  if(!out) return;
+  out.addEventListener('click', e => {
+    const sp = e.target.closest('.err-fix');
+    if(!sp || sp.classList.contains('editing')) return;
+    sp.classList.add('editing');
+    sp.dataset.orig = sp.textContent;
+    sp.contentEditable = 'plaintext-only';
+    sp.focus();
+    const r = document.createRange(); r.selectNodeContents(sp);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  out.addEventListener('keydown', e => {
+    const sp = e.target.closest && e.target.closest('.err-fix.editing');
+    if(!sp) return;
+    if(e.key === 'Enter'){ e.preventDefault(); sp.blur(); }
+    if(e.key === 'Escape'){ sp.dataset.cancel = '1'; sp.blur(); }
+  });
+  out.addEventListener('focusout', e => {
+    const sp = e.target.closest && e.target.closest('.err-fix.editing');
+    if(!sp) return;
+    sp.classList.remove('editing');
+    sp.contentEditable = 'false';
+    const cancel = sp.dataset.cancel === '1';
+    delete sp.dataset.cancel;
+    const orig = sp.dataset.orig || '';
+    const nv = (sp.textContent || '').trim();
+    if(cancel || nv === orig || !nv){ paintErrFixSpans(); return; }
+    applyProofEdit(sp.dataset.fp, orig, nv);
+  });
+})();

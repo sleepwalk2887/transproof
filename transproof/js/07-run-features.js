@@ -517,7 +517,9 @@ async function run(extOnly){
     renderDecisionPanel(text); // v4.2.1：输出含争议词条时亮出点选面板
     // v4.9.0：错误分类统计筛选 + 阶段接力 + 同步到项目看板
     markErrorLines();
+    renderAuditControls(); // P2：批注「已修/未修」状态（v4.26.0）
     renderErrorFilter(text);
+    paintErrFixSpans(); // P3：修订段标红 + 点击内联修正（v4.26.0）
     renderStageNext();
     renderPostBar();
     syncToProject(text, dst);
@@ -636,7 +638,9 @@ async function continueRun(){
     collapseSections();
     renderDecisionPanel(full2);
     markErrorLines();
+    renderAuditControls(); // P2：批注「已修/未修」状态（v4.26.0）
     renderErrorFilter(full2);
+    paintErrFixSpans(); // P3：修订段标红 + 点击内联修正（v4.26.0）
     renderStageNext();
     renderPostBar();
     syncToProject(full2, $('#dst').value);

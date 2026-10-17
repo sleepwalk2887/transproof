@@ -327,6 +327,22 @@ td input:focus,td select:focus{background:var(--bg3);border-color:var(--ac)}
 .stage-btn:hover{color:var(--tx)}
 .stage-btn.on{background:var(--grad-ac);color:#fff;font-weight:var(--fw-strong)}
 .ef-chip{padding:4px 12px;border-radius:14px;border:1px solid var(--bd2);background:var(--bg3);font-size:11.5px;cursor:pointer;transition:.15s;color:var(--tx2);white-space:nowrap}
+/* P2/P3 批注修正闭环（v4.26.0）：已修标记 + 译文标红 + 内联修正 */
+.ef-fix-btn{margin-left:8px;padding:0 6px;font-size:11px;border:1px solid var(--bd2);border-radius:2px;background:var(--bg3);color:var(--tx3);cursor:pointer;white-space:nowrap;transition:.15s}
+.ef-fix-btn:hover{border-color:var(--ok);color:var(--tx2)}
+.ef-fix-btn.on{background:rgba(63,185,80,.14);border-color:var(--ok);color:var(--ok-tx)}
+li.ef-done{opacity:.75}
+li.ef-done::after{content:'✓ 已修';float:right;font-size:11px;color:var(--ok-tx);background:rgba(63,185,80,.14);border:1px solid var(--ok);padding:0 6px;border-radius:2px;margin-left:8px}
+.ef-progress{font-size:11.5px;color:var(--tx3);margin-left:8px;white-space:nowrap}
+.err-fix{background:rgba(214,58,44,.16);border-bottom:1.5px solid var(--err);padding:0 2px;cursor:text;border-radius:2px}
+.err-fix.editing{background:rgba(63,185,80,.12);border-bottom-color:var(--ok);outline:none;box-shadow:0 0 0 2px rgba(63,185,80,.25)}
+/* P1 收录核查结果弹窗（v4.26.0） */
+.vf-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bd)}
+.vf-row:last-child{border-bottom:none}
+.vf-badge{flex:none;font-size:11px;padding:1px 8px;border:1px solid var(--bd2);border-radius:2px}
+.vf-badge.ok{background:rgba(63,185,80,.14);border-color:var(--ok);color:var(--ok-tx)}
+.vf-badge.doubt{background:rgba(210,153,34,.15);border-color:var(--warn);color:var(--warn-tx)}
+.vf-badge.bad{background:rgba(248,81,73,.15);border-color:var(--err);color:var(--err-tx)}
 .ef-chip:hover{border-color:var(--ac)}
 .ef-chip.on{background:var(--grad-ac);border-color:transparent;color:#fff;font-weight:var(--fw-strong)}
 .proof-badge{display:inline-flex;gap:4px;align-items:center;padding:0px 8px;border-radius:10px;font-size:10.5px;white-space:nowrap}

@@ -308,7 +308,7 @@ function renderGlossTable(){
       '<td class="g-src" title="' + esc(srcNames) + '">' + esc(srcNames) + '</td>' +
       '<td><span class="g-status ' + (t.status||'pending') + '">' + ({pending:'待审核',confirmed:'已确认',rejected:'已拒绝'}[t.status||'pending']) + '</span></td>' +
       '<td class="g-rec">' + recLabel + '</td>' +
-      '<td style="white-space:nowrap"><button class="btn gray sm" data-lookup title="联网查证通行译法">🔎</button> <button class="btn gray sm" data-edit>编辑</button> <button class="btn gray sm" data-merge1 title="把另一条合并进此条">⇄</button> <button class="btn gray sm" data-del title="删除此条">🗑</button></td>' +
+      '<td style="white-space:nowrap"><button class="btn gray sm" data-lookup title="联网查证通行译法">🔎</button> <button class="btn gray sm" data-verify title="AI 核查该条收录是否正确（v4.26.0）">🤖 核查</button> <button class="btn gray sm" data-edit>编辑</button> <button class="btn gray sm" data-merge1 title="把另一条合并进此条">⇄</button> <button class="btn gray sm" data-del title="删除此条">🗑</button></td>' +
       '</tr>';
   }).join('');
   // 行事件
@@ -322,6 +322,18 @@ function renderGlossTable(){
       renderGlossBatch();
     };
     tr.querySelector('[data-lookup]').onclick = () => glossLookup(id);
+    tr.querySelector('[data-verify]').onclick = async () => {
+      const items = [{ src: t.foreign || '', dst: t.zh || '', extra: t.type || '' }];
+      const vs = await verifyEntries(items, tr.querySelector('[data-verify]'));
+      if(!vs) return;
+      showVerifyResults(items, vs, { onAdopt: (k, v) => {
+        if(!v.suggest) return false;
+        t.zh = v.suggest; t.status = 'pending';
+        saveGloss(); renderGlossTable();
+        toast('已改为建议译法，状态回到「待审核」');
+        return true;
+      }});
+    };
     tr.querySelector('[data-edit]').onclick = () => glossEdit(id);
     tr.querySelector('[data-merge1]').onclick = () => glossMergeInto(id);
     tr.querySelector('[data-del]').onclick = () => glossDelete(id);

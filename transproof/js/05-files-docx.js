@@ -771,7 +771,7 @@ function saveTask(){
   try{
     const snap = {
       page: ((document.querySelector('nav button.on')||{}).dataset||{}).page || 'p-work',
-      work: { src:$('#src').value, dst:$('#dst').value, extra:$('#extra').value, out:LAST_OUT },
+      work: { src:$('#src').value, dst:$('#dst').value, extra:$('#extra').value, out:LAST_OUT, auditFix: (typeof AUDIT_FIX === 'object' && AUDIT_FIX && Object.keys(AUDIT_FIX).length) ? AUDIT_FIX : null },
       trans: { src:$('#ts-src').value, out:TS_LAST_OUT },
       files: { src:fileSnap(__TP_FILES.src), dst:fileSnap(__TP_FILES.dst), tsSrc:fileSnap(TS_FILES.src) },
       t: Date.now()
@@ -790,7 +790,11 @@ function restoreTask(s){
     if(s.work.src) $('#src').value = s.work.src;
     if(s.work.dst) $('#dst').value = s.work.dst;
     if(s.work.extra) $('#extra').value = s.work.extra;
-    if(s.work.out){ LAST_OUT = s.work.out; $('#out').innerHTML = md(s.work.out); $('#outHint').textContent = '已恢复上次结果'; }
+    if(s.work.out){
+      LAST_OUT = s.work.out; $('#out').innerHTML = md(s.work.out); $('#outHint').textContent = '已恢复上次结果';
+      AUDIT_FIX = (s.work.auditFix && typeof s.work.auditFix === 'object') ? s.work.auditFix : {};
+      markErrorLines(); renderAuditControls(); renderErrorFilter(LAST_OUT); paintErrFixSpans();
+    }
   }
   if(s.trans){
     if(s.trans.src) $('#ts-src').value = s.trans.src;
