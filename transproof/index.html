@@ -347,6 +347,7 @@ li.ef-done::after{content:'✓ 已修';float:right;font-size:11px;color:var(--ok
 .vf-badge.ok{background:rgba(63,185,80,.14);border-color:var(--ok);color:var(--ok-tx)}
 .vf-badge.doubt{background:rgba(210,153,34,.15);border-color:var(--warn);color:var(--warn-tx)}
 .vf-badge.bad{background:rgba(248,81,73,.15);border-color:var(--err);color:var(--err-tx)}
+.ef-dedup{margin-left:8px;font-family:var(--f-mono);font-size:11px;color:var(--warn-tx);border:1px solid var(--warn);padding:0 4px;vertical-align:middle}
 .ef-chip:hover{border-color:var(--ac)}
 .ef-chip.on{background:var(--grad-ac);border-color:transparent;color:#fff;font-weight:var(--fw-strong)}
 .proof-badge{display:inline-flex;gap:4px;align-items:center;padding:0px 8px;border-radius:10px;font-size:10.5px;white-space:nowrap}
@@ -1021,6 +1022,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
         <button class="btn pri" id="ts-btn-run" style="padding:9px 22px">▶ 开始翻译</button>
+        <button class="btn" id="btn-pipeline" title="三段流水线：翻译 → 批评 → 精修，一次操作自动串三次调用，每段产物你过目再进下一段（v4.29.0）">⚙ 三段流水线</button>
         <button class="btn gray sm" id="ts-btn-stop" disabled>■ 中断</button>
         <span id="ts-runStat" style="font-size:12px;color:var(--tx3);align-self:center"></span>
       </div>
@@ -1560,6 +1562,8 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>✏ 译文里标红就地改（v4.27 新）</b></td><td>批注对应位置的修订译文会标红，点一下直接编辑、回车生效——改错不用再跑一遍校对</td></tr>
           <tr><td><b>🔎 专名体检（v4.28 新）</b></td><td>一键本地体检（不花 token）：人名、历史事件等专有名词的「同名异译 / 疑似未译 / 数字对不上」三类问题一次抓出，弹窗里选统一译法、一键全局替换</td></tr>
           <tr><td><b>✏ 编辑/替换（v4.28 新）</b></td><td>校对结果和翻译输出都能直接编辑：像 Word 一样查找、替换、全部替换（显示找到几处），改完「保存并重渲」立即生效；也可放弃修改还原</td></tr>
+          <tr><td><b>🗂 批注去重（v4.29 新）</b></td><td>AI 有时会把同一条修改重复好几遍——现在重复的批注自动折叠成一条，边上标「×3 重复已折叠」，不用再一条条翻</td></tr>
+          <tr><td><b>⚙ 三段流水线（v4.29 新）</b></td><td>翻译页新按钮：初稿 → 批评 → 精修三段接力。第二个 AI 当审校只挑毛病出清单，第三个按清单精修；每段停下给你过目，你点「下一段」才继续</td></tr>
         </tbody>
       </table>
       <div class="alert i" style="margin-top:12px">
@@ -1733,5 +1737,6 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 <script src="js/10-app-init.js"></script>
 <script src="js/11-feedback.js"></script>
 <script src="js/12-editbox.js"></script>
+<script src="js/13-pipeline.js"></script>
 </body>
 </html>

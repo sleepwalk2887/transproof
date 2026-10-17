@@ -31,6 +31,38 @@ function markErrorLines(){
     if(k) li.dataset.tag = TAG[k] || '检';
   });
 }
+/* v4.29.0：批注去重。模型偶发退化重复（同一条修改重复 N 遍）会让用户看到刷屏的重复项，
+   这里按签名（类型|片段|改法）分组，只保留首条并在其后折叠标注「×N 重复已折叠」。 */
+function dedupAuditLines(){
+  const seen = new Map();
+  let dupN = 0;
+  document.querySelectorAll('#out li[data-err]').forEach(li => {
+    if(!li.dataset.err) return;
+    const sig = auditParseLi(li).fp;
+    if(!sig || sig === '|' || sig === '||') return;
+    if(seen.has(sig)){
+      dupN++;
+      li.style.display = 'none'; // 折叠重复项
+      li.dataset.dedup = '1';
+    }else{
+      seen.set(sig, li);
+    }
+  });
+  // 给每个被折叠的组，在首条上挂一个「×N」角标，让用户知道有重复被收起
+  seen.forEach(li => {
+    let n = 0;
+    document.querySelectorAll('#out li[data-dedup]').forEach(d => {
+      if(auditParseLi(d).fp === auditParseLi(li).fp) n++;
+    });
+    let bd = li.querySelector('.ef-dedup');
+    if(n > 0){
+      if(!bd){ bd = document.createElement('span'); bd.className = 'ef-dedup'; li.appendChild(bd); }
+      bd.textContent = '×' + (n + 1) + ' 重复已折叠';
+      bd.title = '模型把这条修改重复输出了 ' + (n + 1) + ' 次，已只保留 1 条（重复的已隐藏，不影响你的译文）';
+    }else if(bd){ bd.remove(); }
+  });
+  return dupN;
+}
 function renderErrorFilter(text){
   const cats = parseErrorCategories(text || LAST_OUT);
   const keys = Object.keys(cats);

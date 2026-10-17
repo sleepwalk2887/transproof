@@ -11,8 +11,8 @@
 
 - 定位：把「外文原文 + 中文译文」交给 AI，逐句对照，揪出漏译/误译/翻译腔，统一术语、规范格式、给出可粘贴的注释。
 - 目标用户：文科翻译 / 学术译者（用户本人是文科生，看重「省事、省 token、术语一致」）。
-- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.28.0，见第八节第 4 条发布方式）
-- 当前版本：**v4.28.0**
+- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.29.0，见第八节第 4 条发布方式）
+- 当前版本：**v4.29.0**
 
 ## 二、技术栈（很轻，别怕）
 
@@ -29,7 +29,7 @@
 transproof/
 ├── index.html        # 主程序（核心，几乎一切都在这里）
 ├── config.js         # 外部配置（提示词模板、配色、钩子，用户可改）
-├── tests/            # 32 个 Playwright 测试（01～30 + 33/34）
+├── tests/            # 34 个 Playwright 测试（01～30 + 33～36）
 ├── 乱风企划tips.md    # 取经笔记 + 功能进化清单（借鉴 GitHub / BelinDoc 的路线图）
 └── _verify.png       # 测试截图（可忽略）
 project-memory/
@@ -39,7 +39,7 @@ project-memory/
 ├── 2026-10-10.md     # 开发日志（v4.17.0 术语集合 / v4.18.0 质量预估 / v4.19.0 联网查证 / v4.20.0 词条批量管理）
 └── 2026-10-11.md     # 开发日志（v4.21.0 Swiss×NASA-punk 融合 UI 改造）
     ├── 2026-10-12.md     # 开发日志（v4.21.1 CDN 多源兜底 / v4.21.2 扫描件 OCR 语言包同源修复 / v4.21.3 换行修复 / v4.22.0 PDF 注释识别 / v4.23.0 P2 多模型 + P1 模糊匹配与修订模式）
-    └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造 + v4.25.1 模块化拆分 + v4.25.2 效果演示卡 + v4.26.0 报错反馈 + v4.27.0 三问题改进：收录核查·修正流转·译文内联改错 + v4.28.0 专名体检+编辑查找替换）
+    └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造 + v4.25.1 模块化拆分 + v4.25.2 效果演示卡 + v4.26.0 报错反馈 + v4.27.0 三问题改进：收录核查·修正流转·译文内联改错 + v4.28.0 专名体检+编辑查找替换 + v4.29.0 批注去重·三段流水线）
 ```
 
 ## 四、核心架构（关键函数锚点）
@@ -104,6 +104,7 @@ project-memory/
 - **v4.26.0** 报错反馈自助提交 + 任务页展示：右下角常驻「📩 反馈」按钮（覆盖全功能区），弹窗必填 问题描述/出现时间/出现地点（操作路径）、选填 功能/联系方式，自动附带 版本号·当前页·最近 JS 报错（环形缓冲 20 条）；提交先落本地 `tp.fb.log` 再 POST 同源 `/api/feedback/submit`，成功给编号 FB-XXX，断网留本地可在「项目进度」页点「重发」；任务页新增「反馈记录」卡（计数 + 刷新 + 逐条列表）。架构：CF 边缘 Worker `_worker.js` 回源独立 Worker（transproof-feedback.transproof-tasks.workers.dev，OAuth 注册子域 transproof-tasks）→ Workers KV（binding `FB_KV`，namespace f22d5e2a…be463），后端校验必填与限长、id=FB-<base36>、list cap 500。新增 `js/11-feedback.js`（ALL_KEYS 加 tp.fb.log 共 14 键）与 `tests/30-feedback.js` 11 断言；顺手修 CDN 失联（tesseract 主脚本/mammoth/pdfjs 补 npmmirror 首选源，路径 `registry.npmmirror.com/<pkg>/<ver>/files/<path>`，救回 22/24 两测）。全量 **30/30 全绿**，版本号 `js/01-core.js:2` = 4.26.0
 - **v4.27.0** 三问题改进（术语收录核查 / 误译修正流转 / 译文内联改错）：①**收录正确性核查**——术语库行、译词库行、决策面板 dp-foot 三个入口挂「🤖 核查」，`VERIFY_SYS` 让 AI 判 verdict（ok/doubt/bad+理由+建议译法），结果弹窗 `.vf-row` 一键采用（好选项直接入库、坏选项打回）；②**提醒→修正状态流转**——`AUDIT_FIX` 状态机（01-core 跨模块共享），批注卡「标记已修」按钮 + 「未修 N」筛选 chip + 「已修 x/N」进度，随任务 saveTask/restoreTask 持久化；③**译文标红就地改错**——`paintErrFixSpans` 按批注「新译」定位修订后译文包 `.err-fix` 标红，点击 `contenteditable` 直接编辑，`applyProofEdit` 回写 LAST_OUT+saveTask+全管线重渲。`_probe-fix.js` PROBE PASS（2→1→0 流转、标红、写回、持久化、核查采用、0 报错）；`_check` bad=0，全量 **30/30 全绿**。连带：伊里因科夫六机制登记（tips「📚 六机制·单人翻译版待办」节 M1-M6 + TASKS.md T-009～T-014 六卡）。版本号 `js/01-core.js:2` = 4.27.0
 - **v4.28.0** 专名体检 + 编辑/查找替换：①**🔎 专名体检**（零 token 本地三类检测：同名异译/疑似未译/数字对不上，`proNounAudit` js/08，lookaround 修 `\b` 中文邻接失效坑），弹窗选译法「统一为所选」全局替换；②**✏️ 编辑/查找替换**（js/12-editbox.js，校对结果 + 翻译输出双入口，查找/替换/全部替换/计数/保存并重渲/放弃修改）；③**Word 式同错替换**（`applyProofEdit` 段内剩余相同文本 confirm 全替换）；④测试 33（8 断言）/34（9 断言），开发坑：正则 `\b` 中文邻接（改 lookaround）、`#ts-out` 在 `#p-trans` 页要先切页、`promptResumeTask` 400ms 定时器与夹具赛跑（测试先 waitForTimeout(800)）。`_check` bad=0、验收 7/7（non-4px 归零）、全量 **32/32 全绿**。版本号 `js/01-core.js:2` = 4.28.0
+- **v4.29.0** 批注去重（真实用户反馈修复）+ 三段流水线 T-002：①**批注去重** `dedupAuditLines()` js/08-render-audit.js（按 `auditParseLi(li).fp` 分组，重复项 display:none + data-dedup=1，首条挂 `.ef-dedup` 角标『×N 重复已折叠』）；起因 = 反馈日志 `FB-MVBZVHKG-SOZ`「一直重复将 recuperation 改为后殖民」，grep 全仓 0 命中 → 定性**模型退化重复循环**（同一条修改重复 N 遍）而批注列表无去重导致刷屏；接线两处 = `run()` js/07-run-features.js:522 与 `restoreTask` js/05-files-docx.js:796。②**三段流水线** `js/13-pipeline.js`（新 13 号模块，`PL`/`plRun(n)`/`plOpen()`，入口 `#btn-pipeline` 翻译页）：翻译→批评→精修三段，callModelSimple 分段 maxTok 8000/3000/8000，失败给可读提示+「↻ 重试第 n 段」、可中断、第3段解锁「送去校对」回填 #dst；**批评段输入白名单**（T-010）= 只依据 原文/译稿/术语表、只产清单不改译文、类型 9 类枚举、优先硬伤。③测试 35-dedup（7 断言）/36-pipeline（14 断言，含批评段 sys/user 白名单断言）；开发坑 = `.ef-dedup` margin-left 6px 破 4px 网格（改 8px）。`_check` bad=0（js=13）、验收 7/7（non-4px 归零）、全量 **34/34 全绿**。版本号 `js/01-core.js:2` = 4.29.0
 
 ## 七、测试方式
 
