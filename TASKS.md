@@ -39,14 +39,6 @@
 
 ## 待办（todo）
 
-### T-001 修订对照三栏逐句视图
-- **priority:** P2
-- **status:** todo
-- **来源:** 乱风企划tips.md Top1（🟡 半成品「修订对照视图」的自然升级）
-- **需求:** 现在只显示改动片段对照，升级为逐句对齐的三栏：原文 | 原译 | 修订。让读者一眼看出每句怎么改的。
-- **验收:** 校对结果页可切换三栏视图；句对齐不串行；不改任何按钮 id；全量 29/29 不回归（建议补 1 个新测试编号 30）；按发版铁律收尾。
-- **技术提示:** 改动片段数据已在 out 解析中，需按句切分对齐；参考 index.html 中 renderErrorFilter / collapseSections 的实现风格。
-
 ### T-002 三段流水线（翻译 → 批评 → 精修）
 - **priority:** P2
 - **status:** done
@@ -110,6 +102,14 @@
 - **技术提示:** 字段对齐演进路线 2-2（rev,parent,ts,actor,type,payload）。
 
 ## 已完成（done）
+
+### T-001 修订对照三栏逐句视图
+- **priority:** P2 · **status:** done（v4.30.0 已上线）
+- **内容:** ③校对结果卡加「文档 / 三栏对照」切换条（新 id `#btn-view-doc` / `#btn-view-tri`，旧按钮零改动），三栏 = 原文｜原译（送校）｜修订（模型改后）。逻辑全在 `js/08-render-audit.js` 末尾（`triBuild` / `renderTriView` / `setOutView` / `syncOutView`，纯本地零 token）。
+- **对齐策略（验收「不串行」的关键）:** 跨语言句数天然不等 ⇒ **原文按段整段跨行**（`grid-row:span N`），原译与修订都是同源中文、按句末标点切句后在同段内按序号配对；不做中英句级硬配，段落间用 `data-para` 分组，互不串段。
+- **高亮:** 复用 `parseEdits()` —— `to` 片段在修订列标绿（`.tri-add` + 绿点），`from` 片段在原译列标红删除线（`.tri-del`）。
+- **附加:** 顶部「N 段 · N 句 · 批注 N 处（N 句含改动）· 本地生成，不花 token」；「⧉ 复制三栏表格」TSV（可直贴 Excel）、「⧉ 复制修订全文」、「↩ 回文档视图」；`#post-bar` 在三栏下暂存隐藏、切回原样；新 `run()` 与 `restoreTask()` 都会 `syncOutView()` 归位；移动端 760px 以下退回单列。
+- **验证:** `node _check.js` bad=0；新测试 `tests/31-tri-column.js` 8/8；全量 **36/36 全绿**；截图目检布局正常。
 
 ### T-000 包交付基线
 - **priority:** P1 · **status:** done

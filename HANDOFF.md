@@ -11,12 +11,12 @@
 
 - 定位：把「外文原文 + 中文译文」交给 AI，逐句对照，揪出漏译/误译/翻译腔，统一术语、规范格式、给出可粘贴的注释。
 - 目标用户：文科翻译 / 学术译者（用户本人是文科生，看重「省事、省 token、术语一致」）。
-- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.29.1，见第八节第 4 条发布方式）
-- 当前版本：**v4.29.1**
+- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.30.0，见第八节第 4 条发布方式）
+- 当前版本：**v4.30.0**
 
 ## 二、技术栈（很轻，别怕）
 
-- **模块化纯前端（v4.25.1 起拆分）**：`transproof/index.html`（约 1600 行）只留 HTML + CSS，全部原生 JS 按加载顺序拆成 `transproof/js/01-core.js ～ 10-app-init.js` 十个模块（classic script 顺序加载，行为与原单文件完全一致）；改代码前先读第七节测试方式，改动必须过全量 30 项。
+- **模块化纯前端（v4.25.1 起拆分）**：`transproof/index.html`（约 1600 行）只留 HTML + CSS，全部原生 JS 按加载顺序拆成 `transproof/js/01-core.js ～ 10-app-init.js` 十个模块（classic script 顺序加载，行为与原单文件完全一致）；改代码前先读第七节测试方式，改动必须过全量 36 项。
   - ⚠️ **拆分红线（v4.25.2 线上回归教训）**：classic script **无跨文件提升**——在先模块（02/03…）不能在加载阶段引用后模块的顶层变量，**包括 `setTimeout(fn,…)` 这类回调**（100ms 也可能早于后模块执行）。所有跨模块共享的数据声明（`GLOSS`/`PROMPTS`/`CFG`/`TERMS` 等 `let/const`）必须前置到 `js/01-core.js`，后模块只放函数。
 - 无构建、无框架、无后端。数据全部存在浏览器 `localStorage`。
 - 调用 LLM：OpenAI 兼容接口（`CFG.baseUrl + '/chat/completions'`），SSE 流式（`Authorization: Bearer CFG.apiKey`）。默认 DeepSeek。
@@ -29,7 +29,7 @@
 transproof/
 ├── index.html        # 主程序（核心，几乎一切都在这里）
 ├── config.js         # 外部配置（提示词模板、配色、钩子，用户可改）
-├── tests/            # 35 个 Playwright 测试（01～30 + 33～37）
+├── tests/            # 36 个 Playwright 测试（01～30 + 31 + 33～37）
 ├── 乱风企划tips.md    # 取经笔记 + 功能进化清单（借鉴 GitHub / BelinDoc 的路线图）
 └── _verify.png       # 测试截图（可忽略）
 project-memory/
@@ -40,6 +40,7 @@ project-memory/
 └── 2026-10-11.md     # 开发日志（v4.21.0 Swiss×NASA-punk 融合 UI 改造）
     ├── 2026-10-12.md     # 开发日志（v4.21.1 CDN 多源兜底 / v4.21.2 扫描件 OCR 语言包同源修复 / v4.21.3 换行修复 / v4.22.0 PDF 注释识别 / v4.23.0 P2 多模型 + P1 模糊匹配与修订模式）
     └── 2026-10-14.md     # 开发日志（v4.24.0 开屏/分组/疑难标注 + v4.25.0 UI 融合改造 + v4.25.1 模块化拆分 + v4.25.2 效果演示卡 + v4.26.0 报错反馈 + v4.27.0 三问题改进：收录核查·修正流转·译文内联改错 + v4.28.0 专名体检+编辑查找替换 + v4.29.0 批注去重·三段流水线 + v4.29.1 校对提示词纪律（不猜补·优先级链））
+        └── 2026-10-18.md # 开发日志（dsh 宿主环境修复全过程 + v4.30.0 三栏逐句对照 T-001）
 ```
 
 ## 四、核心架构（关键函数锚点）
@@ -57,7 +58,10 @@ project-memory/
 | `makeStreamRenderer(el)` | 流式渲染节流（纯文本，防卡顿） |
 | `collapseSections()` | 把批注/注释/争议折叠成 `<details>` |
 | `termAudit()` / `showTermAudit()` | 术语一致性体检（本地零成本） |
-| `parseEdits()` / `showEditDiff()` | 改动对照视图 |
+| `parseEdits()` / `showEditDiff()` | 改动对照视图（弹窗版） |
+| `triBuild()` / `renderTriView()` | 三栏逐句对照视图（T-001，结果页内联，零 token） |
+| `setOutView(v)` / `syncOutView()` | 结果区「文档 / 三栏对照」视图切换与显隐同步 |
+| `extractProofText(mdText)` | 从模型回复抽出「## 一、修订后译文」正文（三栏「修订」列数据源） |
 | `learnFromResult()` / `findMemoryMatches()` | 翻译记忆（本地句对复用） |
 | `syncToProject()` | 校对结果同步到项目看板 |
 | `parseFile()` | 文件解析（docx/pdf/图片 OCR） |
@@ -105,6 +109,7 @@ project-memory/
 - **v4.27.0** 三问题改进（术语收录核查 / 误译修正流转 / 译文内联改错）：①**收录正确性核查**——术语库行、译词库行、决策面板 dp-foot 三个入口挂「🤖 核查」，`VERIFY_SYS` 让 AI 判 verdict（ok/doubt/bad+理由+建议译法），结果弹窗 `.vf-row` 一键采用（好选项直接入库、坏选项打回）；②**提醒→修正状态流转**——`AUDIT_FIX` 状态机（01-core 跨模块共享），批注卡「标记已修」按钮 + 「未修 N」筛选 chip + 「已修 x/N」进度，随任务 saveTask/restoreTask 持久化；③**译文标红就地改错**——`paintErrFixSpans` 按批注「新译」定位修订后译文包 `.err-fix` 标红，点击 `contenteditable` 直接编辑，`applyProofEdit` 回写 LAST_OUT+saveTask+全管线重渲。`_probe-fix.js` PROBE PASS（2→1→0 流转、标红、写回、持久化、核查采用、0 报错）；`_check` bad=0，全量 **30/30 全绿**。连带：伊里因科夫六机制登记（tips「📚 六机制·单人翻译版待办」节 M1-M6 + TASKS.md T-009～T-014 六卡）。版本号 `js/01-core.js:2` = 4.27.0
 - **v4.28.0** 专名体检 + 编辑/查找替换：①**🔎 专名体检**（零 token 本地三类检测：同名异译/疑似未译/数字对不上，`proNounAudit` js/08，lookaround 修 `\b` 中文邻接失效坑），弹窗选译法「统一为所选」全局替换；②**✏️ 编辑/查找替换**（js/12-editbox.js，校对结果 + 翻译输出双入口，查找/替换/全部替换/计数/保存并重渲/放弃修改）；③**Word 式同错替换**（`applyProofEdit` 段内剩余相同文本 confirm 全替换）；④测试 33（8 断言）/34（9 断言），开发坑：正则 `\b` 中文邻接（改 lookaround）、`#ts-out` 在 `#p-trans` 页要先切页、`promptResumeTask` 400ms 定时器与夹具赛跑（测试先 waitForTimeout(800)）。`_check` bad=0、验收 7/7（non-4px 归零）、全量 **32/32 全绿**。版本号 `js/01-core.js:2` = 4.28.0
 - **v4.29.0** 批注去重（真实用户反馈修复）+ 三段流水线 T-002：①**批注去重** `dedupAuditLines()` js/08-render-audit.js（按 `auditParseLi(li).fp` 分组，重复项 display:none + data-dedup=1，首条挂 `.ef-dedup` 角标『×N 重复已折叠』）；起因 = 反馈日志 `FB-MVBZVHKG-SOZ`「一直重复将 recuperation 改为后殖民」，grep 全仓 0 命中 → 定性**模型退化重复循环**（同一条修改重复 N 遍）而批注列表无去重导致刷屏；接线两处 = `run()` js/07-run-features.js:522 与 `restoreTask` js/05-files-docx.js:796。②**三段流水线** `js/13-pipeline.js`（新 13 号模块，`PL`/`plRun(n)`/`plOpen()`，入口 `#btn-pipeline` 翻译页）：翻译→批评→精修三段，callModelSimple 分段 maxTok 8000/3000/8000，失败给可读提示+「↻ 重试第 n 段」、可中断、第3段解锁「送去校对」回填 #dst；**批评段输入白名单**（T-010）= 只依据 原文/译稿/术语表、只产清单不改译文、类型 9 类枚举、优先硬伤。③测试 35-dedup（7 断言）/36-pipeline（14 断言，含批评段 sys/user 白名单断言）；开发坑 = `.ef-dedup` margin-left 6px 破 4px 网格（改 8px）。`_check` bad=0（js=13）、验收 7/7（non-4px 归零）、全量 **34/34 全绿**。版本号 `js/01-core.js:2` = 4.29.0
+- **v4.30.0** 三栏逐句对照视图（T-001）：③校对结果卡新增「文档 / 三栏对照」切换条（`#btn-view-doc` / `#btn-view-tri`，新 id，旧按钮全不动），三栏 = 原文｜原译（送校）｜修订（模型改后）。实现 `js/08-render-audit.js` 末尾 `triSplitParas`/`triSplitSents`/`triMark`/`triBuild`/`triCopyTable`/`renderTriView`/`setOutView`/`syncOutView`，**纯本地解析、零 token**；**对齐策略** = 原文按段整段展示（`grid-row:span N` 跨行），原译与修订都按中文句末标点切句后同段内按序号配对——跨语言的句数天然不等，**不做中英句级硬配**，因此不会串行；改动片段沿用 `parseEdits()` 的 `to`（修订列 `.tri-add` 绿底 + 绿点）与 `from`（原译列 `.tri-del` 红删除线）高亮；顶部信息行「N 段 · N 句 · 批注 N 处（N 句含改动）· 本地生成，不花 token」，另有「⧉ 复制三栏表格」（TSV，可直接贴 Excel）「⧉ 复制修订全文」「↩ 回文档视图」；`#post-bar` 在三栏视图下暂存隐藏、切回原样恢复；每轮新 `run()` 与 `restoreTask()` 结束都会 `syncOutView()` 归位。测试 `tests/31-tri-column.js` 8 断言；`_check` bad=0、全量 **36/36 全绿**。版本号 `js/01-core.js:2` = 4.30.0
 
 ## 七、测试方式
 

@@ -21,10 +21,10 @@ const fs = require('fs');
 
   console.log('===== 完整备份（迁移用） =====');
 
-  await T('导出备份包含全部 13 类本地数据', async () => {
-    // 设置所有 13 个 key
+  await T('导出备份包含全部 14 类本地数据', async () => {
+    // 设置所有 14 个 key
     await page.evaluate(() => {
-      ['tp.cfg','tp.terms','tp.prefs','tp.history','tp.memory','tp.project','tp.prompts','tp.gloss','tp.task','tp.stage','tp.theme','tp.accent','tp.splash']
+      ['tp.cfg','tp.terms','tp.prefs','tp.history','tp.memory','tp.project','tp.prompts','tp.gloss','tp.task','tp.stage','tp.theme','tp.accent','tp.splash','tp.fb.log']
         .forEach((k, i) => localStorage.setItem(k, '值' + i));
     });
     const [download] = await Promise.all([
@@ -35,7 +35,7 @@ const fs = require('fs');
     const j = JSON.parse(fs.readFileSync(path, 'utf8'));
     if (j.v !== 2) throw new Error('备份版本应为 v2');
     const keys = Object.keys(j.data || {});
-    const ALL = ['tp.cfg','tp.terms','tp.prefs','tp.history','tp.memory','tp.project','tp.prompts','tp.gloss','tp.task','tp.stage','tp.theme','tp.accent','tp.splash'];
+    const ALL = ['tp.cfg','tp.terms','tp.prefs','tp.history','tp.memory','tp.project','tp.prompts','tp.gloss','tp.task','tp.stage','tp.theme','tp.accent','tp.splash','tp.fb.log'];
     const missing = ALL.filter(k => !keys.includes(k));
     if (missing.length) throw new Error('备份缺少 key: ' + missing.join(','));
     console.log('      备份含 ' + keys.length + ' 个 key，完整 ✓');

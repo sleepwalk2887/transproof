@@ -19,7 +19,13 @@ const MIME = {
 };
 
 http.createServer((req, res) => {
-  let p = decodeURIComponent((req.url || '/').split('?')[0]);
+  let p;
+  try {
+    p = decodeURIComponent((req.url || '/').split('?')[0]);
+  } catch (e) {
+    // 非法百分号编码会让 decodeURIComponent 抛异常——回 400 而不是崩掉整个进程
+    res.writeHead(400); res.end('bad request'); return;
+  }
   if (p === '/') p = '/index.html';
   const file = path.join(ROOT, p);
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end('forbidden'); return; }

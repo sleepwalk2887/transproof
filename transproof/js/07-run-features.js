@@ -465,6 +465,7 @@ async function run(extOnly){
   $('#stats').style.display = 'none';
   $('#decision-panel').style.display = 'none'; // 新一轮先收起决策面板
   $('#post-bar').style.display = 'none'; // 新一轮先收起分类/接力条
+  if(typeof setOutView === 'function') setOutView('doc'); // v4.30.0：新一轮回到文档视图
 
   let sys, user;
   if(extOnly){
@@ -534,6 +535,7 @@ async function run(extOnly){
       toast('🩺 术语体检发现 ' + (autoAudit.conflict.length + autoAudit.multi.length) + ' 处不一致，点「术语体检」一键处理', 'w');
     }
     saveTask();
+    if(typeof syncOutView === 'function') syncOutView(); // v4.30.0：亮出「📄 文档 / 📊 三栏对照」切换条
     const tokTxt = usage
       ? '输入 ' + fmt(usage.prompt_tokens||0) + ' + 输出 ' + fmt(usage.completion_tokens||0) + ' = ' + fmt(usage.total_tokens||0) + ' tokens'
       : '（服务商未返回用量）';

@@ -1,5 +1,5 @@
 /* ═══════════ 配置与状态 ═══════════ */
-const APP_VERSION = '4.29.1'; // 全局版本号：TransProof.version 与 #g-version 标签共用
+const APP_VERSION = '4.30.0'; // 全局版本号：TransProof.version 与 #g-version 标签共用
 const LS = {
   cfg:'tp.cfg', terms:'tp.terms', prefs:'tp.prefs', history:'tp.history', memory:'tp.memory'
 };

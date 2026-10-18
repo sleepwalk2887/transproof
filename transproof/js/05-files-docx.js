@@ -793,7 +793,7 @@ function restoreTask(s){
     if(s.work.out){
       LAST_OUT = s.work.out; $('#out').innerHTML = md(s.work.out); $('#outHint').textContent = '已恢复上次结果';
       AUDIT_FIX = (s.work.auditFix && typeof s.work.auditFix === 'object') ? s.work.auditFix : {};
-      markErrorLines(); renderAuditControls(); renderErrorFilter(LAST_OUT); paintErrFixSpans();
+      markErrorLines(); renderAuditControls(); renderErrorFilter(LAST_OUT); dedupAuditLines(); paintErrFixSpans();
     }
   }
   if(s.trans){
@@ -805,6 +805,7 @@ function restoreTask(s){
   if(s.files && s.files.tsSrc) $('#ts-srcStat').textContent = '已恢复：' + s.files.tsSrc.chapters.length + ' 章节';
   if(s.page){ const b = document.querySelector('nav button[data-page="'+s.page+'"]'); if(b) b.click(); }
   saveTask();
+  if(typeof syncOutView === 'function') syncOutView(); // v4.30.0：恢复结果后同步刷新视图切换条
 }
 function promptResumeTask(){
   try{

@@ -1167,3 +1167,169 @@ function pnOpen(){
   });
 }
 $('#btn-pnoun') && ($('#btn-pnoun').onclick = pnOpen);
+
+/* ═══════════ 三栏逐句对照视图（T-001 · v4.30.0 · 零 token）═══════════
+   原文｜原译｜修订 三栏逐句对齐，全部在本地完成，不调 AI、不花 token。
+   · 修订栏 = extractProofText(LAST_OUT)，即模型输出里的「## 一、修订后译文」
+   · 原译栏 = #dst，也就是送进校对的那份译稿
+   · 原文栏 = #src（可选，没填就标「未填写」）
+   对齐规则（关键）：先按空行切段，段序号一一对应；段内中文两栏（原译 / 修订）
+   按句切分、按顺序配对，句数不等时多出来的句子单独成行 —— 任一行的文字都不会
+   串到相邻行。跨语种的「原文」只按段整段展示，不做句级硬配：中英句子数量天然
+   不等，硬配必然串行（T-001 验收要求「句对齐不串行」）。 */
+let OUT_VIEW = 'doc';
+let TRI_PB_DISP = '';
+
+function triSplitParas(t){
+  return String(t || '').replace(/\r/g, '').split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+}
+function triSplitSents(p){
+  const s = String(p || '').replace(/\s+/g, ' ').trim();
+  if(!s) return [];
+  return s.split(/(?<=[。！？!?…；;])/).map(x => x.trim()).filter(Boolean);
+}
+function triEscRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function triMark(text, frags, cls){
+  const t = String(text || '');
+  if(!t) return '';
+  const fs = (frags || []).filter(f => f && t.indexOf(f) >= 0);
+  if(!fs.length) return esc(t);
+  const uniq = [...new Set(fs)].sort((a, b) => b.length - a.length);
+  const re = new RegExp('(' + uniq.map(triEscRe).join('|') + ')', 'g');
+  return t.split(re).map((seg, i) => (i % 2) ? '<span class="' + cls + '">' + esc(seg) + '</span>' : esc(seg)).join('');
+}
+/* 把 原文 / 原译 / 修订 三份文本整理成逐句行模型（纯函数，便于测试） */
+function triBuild(){
+  const src = (($('#src') || {}).value || '');
+  const dst = (($('#dst') || {}).value || '');
+  const rev = (typeof extractProofText === 'function' ? extractProofText(LAST_OUT) : null) || '';
+  const edits = (typeof parseEdits === 'function' ? parseEdits(LAST_OUT) : []) || [];
+  const sp = triSplitParas(src), dp = triSplitParas(dst), rp = triSplitParas(rev);
+  const rows = [];
+  const nPara = Math.max(sp.length, dp.length, rp.length);
+  const capped = nPara > 400;
+  for(let i = 0; i < nPara && i < 400; i++){
+    const o = triSplitSents(dp[i] || ''), w = triSplitSents(rp[i] || '');
+    const n = Math.max(o.length, w.length, 1);
+    for(let k = 0; k < n; k++){
+      rows.push({ para: i + 1, k, src: k === 0 ? (sp[i] || '') : '', old: o[k] || '', neu: w[k] || '' });
+    }
+  }
+  return { rows, edits, sp, dp, rp, nPara, capped };
+}
+function triCopyTable(){
+  const M = triBuild();
+  if(!M.rows.length){ toast('没有可复制的三栏内容', 'w'); return; }
+  const lines = ['段落\t原文\t原译\t修订'];
+  M.rows.forEach(r => {
+    lines.push([r.k === 0 ? String(r.para) : '', r.k === 0 ? (M.sp[r.para - 1] || '') : '', r.old || '', r.neu || '']
+      .map(x => String(x).replace(/[\t\n]+/g, ' ')).join('\t'));
+  });
+  const txt = lines.join('\n');
+  const done = () => toast('已复制三栏表格（' + M.rows.length + ' 行，可直接粘贴到 Word / Excel）');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, () => toast('复制失败：浏览器没给剪贴板权限', 'e'));
+  }else{
+    const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ toast('复制失败', 'e'); }
+    ta.remove();
+  }
+}
+function renderTriView(){
+  const box = $('#out-tri');
+  if(!box) return;
+  if(!LAST_OUT){
+    box.innerHTML = '<div class="alert i">还没有校对结果。先在上方点「开始校对」，出结果后这里会自动生成三栏对照。</div>';
+    return;
+  }
+  const M = triBuild();
+  if(!M.rp.length){
+    box.innerHTML = '<div class="alert w">这次输出里没找到「## 一、修订后译文」段落，没法生成三栏。可能模型只给了批注、没给修订全文 —— 可以在「设置」里换成更强的模型重跑，或先点「📝 改动对照」逐条看批注。</div>';
+    return;
+  }
+  if(!M.dp.length){
+    box.innerHTML = '<div class="alert i">「原译」栏是空的：请把送校对的译文填进上方文本框（或从「文件」载入），再切回三栏对照。</div>';
+    return;
+  }
+  const found = new Array(M.edits.length).fill(false);
+  M.rows.forEach(r => {
+    M.edits.forEach((e, i) => {
+      if((e.to && r.neu.indexOf(e.to) >= 0) || (e.from && r.old.indexOf(e.from) >= 0)) found[i] = true;
+    });
+  });
+  const missing = M.edits.filter((e, i) => !found[i]);
+  const toFrags = M.edits.map(e => e.to).filter(Boolean);
+  const fromFrags = M.edits.map(e => e.from).filter(Boolean);
+  const srcOn = !!((($('#src') || {}).value || '').trim());
+  let changed = 0;
+  // 按段分组：原文一格跨整段（grid-row:span N），原译/修订一格格逐句对齐，
+  // 这样「原文整段」与「逐句」互不干扰，也不会出现某格空等高度
+  const byPara = [];
+  M.rows.forEach(r => { (byPara[r.para - 1] = byPara[r.para - 1] || []).push(r); });
+  const body = byPara.map((rows, pi) => {
+    const sp = (M.sp[pi] || '').trim();
+    const srcHtml = sp ? esc(sp) : '<span class="tri-empty">' + (srcOn ? '—' : '（未填写原文）') + '</span>';
+    let out = '<div class="tri-cell src' + (pi ? ' tri-p' : '') + '" style="grid-row:span ' + rows.length + '" data-para="' + (pi + 1) + '">' +
+      '<span class="tri-num">¶' + (pi + 1) + '</span>' + srcHtml + '</div>';
+    rows.forEach(r => {
+      const hasAdd = M.edits.some(e => e.to && r.neu.indexOf(e.to) >= 0);
+      const hasDel = M.edits.some(e => e.from && r.old.indexOf(e.from) >= 0);
+      if(hasAdd || hasDel) changed++;
+      const neuHtml = r.neu ? triMark(r.neu, toFrags, 'tri-add') : '<span class="tri-empty">—</span>';
+      const oldHtml = r.old ? triMark(r.old, fromFrags, 'tri-del') : '<span class="tri-empty">—</span>';
+      out += '<div class="tri-row" data-para="' + r.para + '" data-row="' + r.k + '">' +
+        '<div class="tri-cell old' + (r.k ? '' : ' tri-p') + '">' + oldHtml + '</div>' +
+        '<div class="tri-cell neu' + (r.k ? '' : ' tri-p') + '">' + (hasAdd ? '<span class="tri-dot" title="本句有改动"></span>' : '') + neuHtml + '</div>' +
+        '</div>';
+    });
+    return out;
+  }).join('');
+  box.innerHTML =
+    '<div class="tri-bar">' +
+      '<span class="tri-note">' + M.nPara + ' 段 · ' + M.rows.length + ' 句 · 批注 ' + M.edits.length + ' 处' +
+        (changed ? '（' + changed + ' 句含改动）' : '') + ' · 本地生成，不花 token' + (M.capped ? ' · 超过 400 段只显示前 400 段' : '') + '</span>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn gray sm" id="tri-copy">⧉ 复制三栏表格</button>' +
+      '<button class="btn gray sm" id="tri-copy-rev">⧉ 复制修订全文</button>' +
+      '<button class="btn gray sm" id="tri-back">↩ 回文档视图</button>' +
+    '</div>' +
+    '<div class="tri-table"><div class="tri-head"><div>原文' + (srcOn ? '' : '（未填写）') + '</div><div>原译（送校对稿）</div><div>修订（模型改后）</div></div>' + body + '</div>' +
+    (missing.length ? '<div class="tri-miss">⚠ 有 ' + missing.length + ' 条批注没在正文里定位到（可能被并段或改写幅度太大）：' +
+      missing.slice(0, 8).map(e => '「' + esc(e.to || e.from) + '」').join('、') + (missing.length > 8 ? ' 等' : '') +
+      '。它们仍可在「📝 改动对照」里逐条查看。</div>' : '');
+  $('#tri-copy').onclick = triCopyTable;
+  $('#tri-copy-rev').onclick = () => {
+    const rev = (typeof extractProofText === 'function' ? extractProofText(LAST_OUT) : '') || '';
+    if(!rev){ toast('没有可复制的修订全文', 'w'); return; }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(rev).then(() => toast('已复制修订全文'), () => toast('复制失败：浏览器没给剪贴板权限', 'e'));
+    }else{
+      const ta = document.createElement('textarea'); ta.value = rev; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); toast('已复制修订全文'); }catch(e){ toast('复制失败', 'e'); }
+      ta.remove();
+    }
+  };
+  $('#tri-back').onclick = () => setOutView('doc');
+}
+function setOutView(v){
+  OUT_VIEW = (v === 'tri' && LAST_OUT) ? 'tri' : 'doc';
+  const doc = $('#out'), tri = $('#out-tri');
+  if(!doc || !tri) return;
+  const pb = $('#post-bar');
+  doc.style.display = OUT_VIEW === 'tri' ? 'none' : '';
+  tri.style.display = OUT_VIEW === 'tri' ? '' : 'none';
+  if(pb){
+    if(OUT_VIEW === 'tri'){ TRI_PB_DISP = pb.style.display; pb.style.display = 'none'; }
+    else pb.style.display = TRI_PB_DISP;
+  }
+  $$('#view-seg [data-view]').forEach(b => b.classList.toggle('vs-on', b.dataset.view === OUT_VIEW));
+  if(OUT_VIEW === 'tri') renderTriView();
+}
+/* 每次出结果 / 恢复存档后刷新切换条；没有结果时强制回文档视图 */
+function syncOutView(){
+  const seg = $('#view-seg');
+  if(seg) seg.style.display = LAST_OUT ? 'flex' : 'none';
+  if(!LAST_OUT && OUT_VIEW === 'tri') OUT_VIEW = 'doc';
+  setOutView(OUT_VIEW);
+}
+$$('#view-seg [data-view]').forEach(b => { b.onclick = () => setOutView(b.dataset.view); });

@@ -406,6 +406,31 @@ li.ef-done::after{content:'✓ 已修';float:right;font-size:11px;color:var(--ok
 .diff-copy{flex-shrink:0;padding:0 8px;color:var(--tx3);font-size:14px;line-height:1.2}
 .diff-copy:hover{color:var(--ac)}
 
+/* ---------- 三栏逐句对照视图（T-001 · v4.30.0） ---------- */
+.vs-on{background:var(--ac) !important;border-color:var(--ac) !important;color:#fff !important}
+.tri-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
+.tri-note{font-size:11.5px;color:var(--tx3)}
+.tri-table{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.tri-head,.tri-row{display:contents}
+.tri-head>div{padding:8px 12px;background:var(--bg3);font-size:12px;font-weight:var(--fw-strong);color:var(--tx2);letter-spacing:.04em}
+.tri-cell{padding:9px 12px;font-size:13px;line-height:1.75;background:var(--bg2);min-width:0;overflow-wrap:anywhere}
+.tri-cell.tri-p{box-shadow:inset 0 2px 0 var(--bd2)}
+.tri-cell.src{grid-column:1;color:var(--tx2);font-size:12.5px;background:var(--bg)}
+.tri-cell.old{grid-column:2}
+.tri-cell.neu{grid-column:3}
+.tri-num{font-family:var(--f-mono);font-size:10.5px;color:var(--tx3);margin-right:6px;user-select:none}
+.tri-add{color:var(--ok-tx);background:rgba(63,185,80,.14);border-radius:3px;padding:0 2px}
+.tri-del{color:var(--err-tx);background:rgba(248,81,73,.10);border-radius:3px;padding:0 2px;text-decoration:line-through}
+.tri-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:2px}
+.tri-empty{color:var(--tx3);opacity:.6}
+.tri-miss{margin-top:10px;font-size:11.5px;line-height:1.7;color:var(--warn-tx)}
+@media (max-width:760px){
+  .tri-table{display:block}
+  .tri-head{display:flex;flex-direction:column}
+  .tri-cell{display:block;box-shadow:none}
+  .tri-cell.src{margin-bottom:2px}
+}
+
 /* ---------- 进度条 ---------- */
 .progress-track{flex:1;height:8px;background:var(--bg3);border-radius:6px;overflow:hidden}
 .progress-bar{height:100%;width:0;background:var(--grad-ac);border-radius:6px;transition:width .3s ease}
@@ -722,6 +747,12 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
 
   <div class="card">
     <h3>③ 校对结果 <span class="hint" id="outHint">等待运行</span> <button class="btn gray sm" id="btn-out-edit" title="编辑结果：查找替换、全部替换、改完保存即重渲（v4.28.0）">✏️ 编辑/替换</button></h3>
+    <div id="view-seg" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin:-2px 0 12px">
+      <span class="tb-cap">视图</span>
+      <button class="btn gray sm vs-on" data-view="doc" id="btn-view-doc" title="文档视图：原来的校对结果全文（默认）">📄 文档</button>
+      <button class="btn gray sm" data-view="tri" id="btn-view-tri" title="三栏逐句对照：原文｜原译｜修订，改动处红删绿增（v4.30.0，本地生成、不花 token）">📊 三栏对照</button>
+      <span class="hint" id="view-hint">按段落+句序自动对齐，可整体复制</span>
+    </div>
     <div id="post-bar">
       <div id="err-filter" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
       <div id="stage-next" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"></div>
@@ -731,6 +762,7 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
       <span class="progress-txt" id="progress-txt">0%</span>
     </div>
     <div class="out" id="out" data-ph="校对结果将显示在这里……"></div>
+    <div id="out-tri" style="display:none"></div>
     <div class="stats" id="stats" style="display:none">
       <span>耗时 <b id="s-time">—</b></span>
       <span>原文 <b id="s-src">—</b> 字</span>
@@ -1555,6 +1587,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>🧽 原文/译文整理</b></td><td>语音转写、OCR 出来的乱序噪声文本，先整理再校对：排序、重分段、去噪，不删内容不改风格，Ctrl+Z 可撤销</td></tr>
           <tr><td><b>🏷 本章注释</b></td><td>整书 PDF 自动提取文中数字标号脚注与书末尾注，批量翻译后勾选贴到本章译文末尾（可选只贴译文/只贴原文/双语，可移除）</td></tr>
           <tr><td><b>📋 改动对照</b></td><td>一眼看出 AI 改了哪几处、改成啥，零 token</td></tr>
+          <tr><td><b>📊 三栏对照</b></td><td>原文｜原译｜修订 三栏逐句对齐，改动处红删绿增，可整表复制到 Word / Excel（v4.30.0）</td></tr>
           <tr><td><b>📤 复制 / 转公众号 /  Markdown</b></td><td>结果三种去向：纯修订稿（可勾选段落）、公众号富文本、Markdown</td></tr>
           <tr><td><b>📥 导出校对后 Word / 导回修订模式</b></td><td>见上一张卡片「文档模式」</td></tr>
           <tr><td><b>🤖 核查（v4.27 新）</b></td><td>术语库/译词库/决策面板里问 AI「这个选项收录得对吗」——好选项一键采用入库，坏选项打回，错误选项不再混进可选项</td></tr>
@@ -1691,7 +1724,8 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>近期</b></td><td>术语库云端共享：团队一处更新、处处拉取（免费，无需服务器）</td><td>✅ 轻量版已实现（术语库页「团队云端同步」）</td></tr>
           <tr><td><b>中期</b></td><td>在线版：一个网址打开就能用，手机电脑都行，无需保存文件</td><td>✅ 已上线（transproof.pages.dev，数据仍存本地浏览器）</td></tr>
           <tr><td><b>中期</b></td><td>报错反馈：页面右下角「📩 反馈」一键提交，自动带版本/报错/路径，记录进服务器日志、项目进度页可查</td><td>✅ 已上线（v4.26.0）</td></tr>
-          <tr><td><b>中期</b></td><td>修订对照三栏逐句视图（原文｜原译｜修订）+ 三段流水线（翻译→批评→精修）</td><td>规划中</td></tr>
+          <tr><td><b>中期</b></td><td>修订对照三栏逐句视图（原文｜原译｜修订）</td><td>✅ 已上线（v4.30.0，校对结果页「📊 三栏对照」）</td></tr>
+          <tr><td><b>中期</b></td><td>三段流水线（翻译→批评→精修）</td><td>✅ 已上线（v4.29.0）</td></tr>
           <tr><td><b>远期</b></td><td>完整应用：多人协作、修订留痕、对接出版排版流程</td><td>规划中</td></tr>
           <tr><td><b>近期</b></td><td><b>漏段提醒</b>：校对前自动比对原文与译文的段落，缺段当场标出（在你电脑本地完成，不花钱）</td><td>规划中（低风险）</td></tr>
           <tr><td><b>近期</b></td><td><b>术语权威分级</b>：词条分「待审 / 已批准」两种状态，校对只认已批准的译法；改动已批准译法需负责人再批一次</td><td>规划中</td></tr>
