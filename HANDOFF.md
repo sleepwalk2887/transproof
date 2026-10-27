@@ -11,8 +11,8 @@
 
 - 定位：把「外文原文 + 中文译文」交给 AI，逐句对照，揪出漏译/误译/翻译腔，统一术语、规范格式、给出可粘贴的注释。
 - 目标用户：文科翻译 / 学术译者（用户本人是文科生，看重「省事、省 token、术语一致」）。
-- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.30.0，见第八节第 4 条发布方式）
-- 当前版本：**v4.30.0**
+- 线上地址：**https://transproof.pages.dev**（Cloudflare Pages 静态部署，已上线 v4.36.0，见第八节第 4 条发布方式）
+- 当前版本：**v4.36.0**
 
 ## 二、技术栈（很轻，别怕）
 
@@ -29,7 +29,7 @@
 transproof/
 ├── index.html        # 主程序（核心，几乎一切都在这里）
 ├── config.js         # 外部配置（提示词模板、配色、钩子，用户可改）
-├── tests/            # 36 个 Playwright 测试（01～30 + 31 + 33～37）
+├── tests/            # 42 个 Playwright 测试（01～31 + 33～43）
 ├── 乱风企划tips.md    # 取经笔记 + 功能进化清单（借鉴 GitHub / BelinDoc 的路线图）
 └── _verify.png       # 测试截图（可忽略）
 project-memory/
@@ -61,6 +61,14 @@ project-memory/
 | `parseEdits()` / `showEditDiff()` | 改动对照视图（弹窗版） |
 | `triBuild()` / `renderTriView()` | 三栏逐句对照视图（T-001，结果页内联，零 token） |
 | `setOutView(v)` / `syncOutView()` | 结果区「文档 / 三栏对照」视图切换与显隐同步 |
+| `paraAudit(srcText, dstText)` / `showParaAudit()` | 段落对齐体检（T-011，缺段/多段/空段标位置，本地零 token） |
+| `approvedGloss()` / `glossSetStatus(id, status)` | 术语权威分级（T-012）：唯一闸门只认「已批准」词条 + 状态迁移（待审/已批准/已拒绝），提示词注入点全部走它 |
+| `numAudit(srcText, dstText)` / `showNumAudit()` | 数字与格式体检（T-015，丢失/多出/百分号/漏否定逐处标位，万-亿换算不误报，本地零 token） |
+| `qualityScore(srcText, dstText)` / `showQuality()` | 译文总评分（v4.36：本地算 0–100 + S/A/B/C/D，忠实度 60 / 流畅度 40 拆分，逐条列出扣分项；含未翻译残留、占位符保护） |
+| `auditAll()` / `auditCenterToggle(on)` / `auditOptsGet()` | 体检中心（v4.36：四项体检收一处、逐项可开关且 `tp.auditOpts` 持久化、一键全检聚合） |
+| `toneBriefFor(tone)` / `showToneBrief()` | 风格简报（v4.36：按 `#tone` 体裁调性给 5 条检查清单，本地零流量） |
+| `triInlineToggle(on)` / `renderTriInline()` | 三栏对照翻译区直出（v4.35：`#btn-tri-inline` 开关，输入 300ms 防抖实时刷新） |
+| `triBuildRe(frags)` / `triHit(re, s)` | 三栏提速（v4.35：每轮只拼一次大正则，替代原来每行 `new RegExp`） |
 | `extractProofText(mdText)` | 从模型回复抽出「## 一、修订后译文」正文（三栏「修订」列数据源） |
 | `learnFromResult()` / `findMemoryMatches()` | 翻译记忆（本地句对复用） |
 | `syncToProject()` | 校对结果同步到项目看板 |
@@ -110,6 +118,12 @@ project-memory/
 - **v4.28.0** 专名体检 + 编辑/查找替换：①**🔎 专名体检**（零 token 本地三类检测：同名异译/疑似未译/数字对不上，`proNounAudit` js/08，lookaround 修 `\b` 中文邻接失效坑），弹窗选译法「统一为所选」全局替换；②**✏️ 编辑/查找替换**（js/12-editbox.js，校对结果 + 翻译输出双入口，查找/替换/全部替换/计数/保存并重渲/放弃修改）；③**Word 式同错替换**（`applyProofEdit` 段内剩余相同文本 confirm 全替换）；④测试 33（8 断言）/34（9 断言），开发坑：正则 `\b` 中文邻接（改 lookaround）、`#ts-out` 在 `#p-trans` 页要先切页、`promptResumeTask` 400ms 定时器与夹具赛跑（测试先 waitForTimeout(800)）。`_check` bad=0、验收 7/7（non-4px 归零）、全量 **32/32 全绿**。版本号 `js/01-core.js:2` = 4.28.0
 - **v4.29.0** 批注去重（真实用户反馈修复）+ 三段流水线 T-002：①**批注去重** `dedupAuditLines()` js/08-render-audit.js（按 `auditParseLi(li).fp` 分组，重复项 display:none + data-dedup=1，首条挂 `.ef-dedup` 角标『×N 重复已折叠』）；起因 = 反馈日志 `FB-MVBZVHKG-SOZ`「一直重复将 recuperation 改为后殖民」，grep 全仓 0 命中 → 定性**模型退化重复循环**（同一条修改重复 N 遍）而批注列表无去重导致刷屏；接线两处 = `run()` js/07-run-features.js:522 与 `restoreTask` js/05-files-docx.js:796。②**三段流水线** `js/13-pipeline.js`（新 13 号模块，`PL`/`plRun(n)`/`plOpen()`，入口 `#btn-pipeline` 翻译页）：翻译→批评→精修三段，callModelSimple 分段 maxTok 8000/3000/8000，失败给可读提示+「↻ 重试第 n 段」、可中断、第3段解锁「送去校对」回填 #dst；**批评段输入白名单**（T-010）= 只依据 原文/译稿/术语表、只产清单不改译文、类型 9 类枚举、优先硬伤。③测试 35-dedup（7 断言）/36-pipeline（14 断言，含批评段 sys/user 白名单断言）；开发坑 = `.ef-dedup` margin-left 6px 破 4px 网格（改 8px）。`_check` bad=0（js=13）、验收 7/7（non-4px 归零）、全量 **34/34 全绿**。版本号 `js/01-core.js:2` = 4.29.0
 - **v4.30.0** 三栏逐句对照视图（T-001）：③校对结果卡新增「文档 / 三栏对照」切换条（`#btn-view-doc` / `#btn-view-tri`，新 id，旧按钮全不动），三栏 = 原文｜原译（送校）｜修订（模型改后）。实现 `js/08-render-audit.js` 末尾 `triSplitParas`/`triSplitSents`/`triMark`/`triBuild`/`triCopyTable`/`renderTriView`/`setOutView`/`syncOutView`，**纯本地解析、零 token**；**对齐策略** = 原文按段整段展示（`grid-row:span N` 跨行），原译与修订都按中文句末标点切句后同段内按序号配对——跨语言的句数天然不等，**不做中英句级硬配**，因此不会串行；改动片段沿用 `parseEdits()` 的 `to`（修订列 `.tri-add` 绿底 + 绿点）与 `from`（原译列 `.tri-del` 红删除线）高亮；顶部信息行「N 段 · N 句 · 批注 N 处（N 句含改动）· 本地生成，不花 token」，另有「⧉ 复制三栏表格」（TSV，可直接贴 Excel）「⧉ 复制修订全文」「↩ 回文档视图」；`#post-bar` 在三栏视图下暂存隐藏、切回原样恢复；每轮新 `run()` 与 `restoreTask()` 结束都会 `syncOutView()` 归位。测试 `tests/31-tri-column.js` 8 断言；`_check` bad=0、全量 **36/36 全绿**。版本号 `js/01-core.js:2` = 4.30.0
+- **v4.31.0** 段落对齐体检（T-011 · 六机制 M3「block-id 同构物」）：🧰 工具组新增「🧩 段落对齐」按钮（`#btn-para-audit`，紧跟 专名体检，新 id、旧按钮全不动）。`js/08-render-audit.js` 新增纯函数 `paraAudit(srcText, dstText)`（按空行切段、口径与 `triSplitParas` 完全一致；首尾空壳剥掉、中间空段保留）返回 `{srcN, dstN, diff, status, blanks, missing, extra}`，status 三态 **equal / short（缺段）/ long（多段）**，blanks 记译文整段空白的位置；`showParaAudit()` 照 `showTermAudit` 面板样式逐位置标出「原文第 N 段 → 译文没有对应段落」「译文第 N 段 → 原文没有对应段落」「译文第 N 段是空的」并贴出对应原文/译文摘录（160 字截断），底部「本地比对 · 不调 AI · 不花 token」。接线两处：按钮绑定 `js/08-render-audit.js`（`$('#btn-para-audit') && …` 守卫写法）、`run()` 收尾自动体检 `js/07-run-features.js`（`typeof paraAudit === 'function'` 守卫，段数对不上 toast 提醒一次）。**纯本地零 token**。测试 `tests/38-para-audit.js` 8 断言（按钮/旧锚点不动/三态/空段/面板位置文案/关闭）；`_check` bad=0（js=13）、全量 **37/37 全绿**。版本号 `js/01-core.js:2` = 4.31.0
+- **v4.33.0** 数字与格式体检（T-015 · P0 · 待办功能统一清单第 1 项）：`js/08-render-audit.js` 新增纯函数 `numAudit(srcText, dstText)` + 面板 `showNumAudit()`。四类硬伤逐处标位：①丢失/被改的数字（原文有、译文对不上）②凭空多出的数字 ③百分号丢失（原文有 `%`，译文既无 `%` 也无「百分之」）④疑似漏否定——段数对齐时按空行切段逐段查（原文段有 not/不/无/未 而对应译文段一个否定词都没有），对不齐时退化为否定词总量对比。**万/亿换算自动配对抵消**（`isWan()`：15,000↔1.5万、亿同理，只抵消「一边整条缺失」的，数量对不上的仍报），避免中文换算误报。数字全角转半角、`≥2 位`才查（单数字噪音大）、面板每类最多列 12 条带上下文。接线：`index.html` 🧰 工具组新按钮 `#btn-num-audit`（🔢 数字体检，插在 btn-para-audit 后，旧按钮 id 全不动）；`js/07-run-features.js` run() 收尾自动体检（`typeof numAudit` 守卫，有可疑即 toast）；`js/01-core.js:2` = 4.33.0。测试 `tests/40-num-audit.js` 8 断言（函数定义/丢失检出/多出检出/百分号/漏否定逐段/干净 clean/万换算不误报/按钮+旧锚点+面板开关）；`_check` bad=0（js=13）、全量 **39/39 全绿**
+- **v4.34.0** 三段流水线卡死修复 + 线上报错自动上报（真实用户反馈「进入工作后直接无法使用卡顿」，v4.29.0 埋的三个 bug）：①**段号越位修复**——旧 \`#pl-next.onclick\` 先 \`PL.stage++\` 再检查，失败重试 3 次后 stage 顶到 4 且不回退，按钮永久失灵；改为段号由已完成内容推导（\`!PL.draft ? 1 : (!PL.critique ? 2 : 3)\`），失败/中断永远重跑同一段，\`PL.stage\` 只在 \`plRun\` 真正跑完后推进（stage=已完成到第几段，失败不前进）。②**关弹窗 running 卡死修复**——旧 \`pl-close\` 只 \`closeModal()\` 不清 running，跑到一半关闭再打开后 \`if(PL.running) return\` 把一切拦截；改为关闭即取消本段（\`PL.cancel=true\` + abort + \`PL.running=false\` + \`PL.ctrl=null\`），\`plOpen()\` 重开时也先掐掉残留调用再重置。③**中断立即生效**——\`callModelSimple(sys,user,maxTok, extSignal)\` 加第 4 参外部 AbortController，\`PL.ctrl\` 作运行凭证，「⏹ 中断」与关闭弹窗立即 abort，不再干等 CFG.timeout（默认 180s）；\`finally\` 只在 \`PL.ctrl===ctrl\` 时清 running（避免污染新一轮），弹窗被关/重开过的过期结果直接丢弃；主动中断不再算失败，给「已中断，可重试本段」提示。④**线上报错自动上报** \`js/11-feedback.js\` 新增 \`fbAutoReport(kind,msg)\`：\`unhandledrejection\` 监听（新增）+ 原 \`error\` 监听接入，**线上 https 才发**（本地 http 静默、无 /api 通道）、同报错去重、30 秒节流，走 \`/api/feedback/submit\` 进 KV；开发端 \`_errwatch.js\` 看门狗每 60s 经代理巡检 \`/api/feedback/list\`，发现新条目即退出提醒主控 → 在 DSH 聊天框告知用户。测试 \`tests/41-pipeline-recover.js\` 8 断言（失败后段号不越位/重试真重发×3/4 次后仍本段失败/关弹窗重开能重跑且发新请求）；\`_check\` bad=0（js=13）、全量 **40/40 全绿**。版本号 \`js/01-core.js:2\` = 4.34.0
+- **v4.32.0** 术语权威分级（T-012 · 六机制 M4「approved 状态机」）：专有译词库（`GLOSS.terms`）词条 status 三态 **待审(pending) / 已批准(confirmed) / 已拒绝(rejected)**，校对提示词**只锁定「已批准」的译法**，待审与已拒绝不强制。①**唯一闸门** `approvedGloss()`（`js/09-gloss.js`）：所有提示词注入点必须走它——修掉 4 处泄漏/遗漏：`js/02-prompts-reverse.js` 提炼方针（原漏 status 过滤，`typeof approvedGloss` 守卫因 02 早于 09 加载）、`js/03-translate.js` 翻译段、`js/13-pipeline.js` 管线段、`js/07-run-features.js` buildSystem（原只注 TERMS 不含 GLOSS，现「已批准专有译词锁定一致」块受「术语」勾选控制）。②**状态机** `glossSetStatus(id, status)`（js/09-gloss.js）：迁移即 toast + `saveGloss()` 持久化 + `glossLog` 记录，状态徽章统一走 `G_ST_LABEL`（confirmed 显示「已批准」）；renderGlossTable 状态格下加快捷按钮 `data-approve`（✓ 批准）/`data-topend`（↺ 待审）/`data-toreject`（✗ 拒绝）按状态显隐。③**改已批准需再批**：`js/08-render-audit.js` `showVerifyResults` 新增 `opts.onApprove`——核查判定 `ok`（正确）时渲染「✓ 批准」一键把词条设为已批准；采纳建议（`data-adopt`）仍自动打回「待审核」。旧锚点（btn-audit/btn-view-doc/btn-view-tri）全不动。测试 `tests/39-gloss-approved.js` 7 断言（闸门只认已批准/buildSystem 注入只含已批准/快捷按钮显隐/点批准迁移持久化/glossSetStatus 打回/ok→一键批准/旧锚点不动）；`_check` bad=0（js=13）、全量 **38/38 全绿**。版本号 `js/01-core.js:2` = 4.32.0
+- **v4.35.0** 三栏对照提速 + 翻译区直出（真实用户反馈「三栏对照功能仍然卡顿，我希望该功能成为翻译时的可选项而非翻译框外的工具」）：①**提速**——`js/08-render-audit.js` 原 `renderTriView` 每渲染一行就 `new RegExp()` 一次，O(行数×批注数)；新增 `triBuildRe(frags)`（排序去重后拼一次大正则）与 `triHit(re, s)`（每次 `lastIndex=0` 再 test），正则提到循环外只算一次，`triMark(text, frags, cls, re)` 加第 4 参复用；`missing` 改为按已扫命中的 `seen` 集合过滤。实测 300 段 × 3 次渲染仅 5ms。②**翻译区直出**——译文框下新增 `#btn-tri-inline` 开关与 `#tri-inline` 面板，`triInlineToggle`/`renderTriInline`（300ms 防抖、300 行上限、未校对时修订列标「（未校对）」），`syncOutView()` 末尾接线，`#src`/`#dst` input 监听实时刷新。⚠️ **坑**：按钮原本放在 `#dstFileBar` 里，被 `js/05-files-docx.js:546 renderFileBar()` 在启动时擦掉（该函数会重写 FileBar 的 innerHTML，由 `10-app-init.js:203` 调用）——**任何塞进 FileBar 容器的按钮都会被启动时擦除，必须放在容器外**。测试 `tests/42-tri-inline.js` 8 断言；全量 **41/41 全绿**。版本号 = 4.35.0
+- **v4.36.0** 体检中心 + 译文总评分 + 风格简报（甲乙丙丁四功能，源自 dsh-plugin-translation 借鉴结论 + 排版整理）：①**排版**——🧰 工具组 8 个按钮减到 5 个（本章注释/配图/改动对照/**体检中心**/下载文档），术语·专名·段落·数字四项体检 + 新增总评分/风格简报全部收进隐藏容器 `#audit-center`，由 `#btn-audit-center` 开合；容器内 6 个勾选开关（`ao-term/pnoun/para/num/quality/tone`）+ `▶ 一键体检`，**四个旧按钮 id 一个没动**（tests/38/39/40/42 都断言它们存在）。②**甲 译文总评分** `qualityScore(src,dst)`：忠实度 60 起扣（数字 / 段落 / 术语未按已批准 / 占位符 / 未翻译残留 / 长度比）、流畅度 40 起扣（句数不匹配 / 重复标点 / 超长句），`score = fidelity + fluency`，`qLevel()` 给 S≥90/A≥85/B≥70/C≥50/D，刻度与「质量预估」一致；`showQuality()` 复用 88px 圆环 + 26px 大数字样式 + 逐条扣分明细。③**乙 漏译残留**——`runs = dst.match(/[A-Za-z][A-Za-z'’-]{3,}(?:\s+[A-Za-z][A-Za-z'’-]{2,}){2,}/g)` 抓成片未翻英文；另加「译文几乎没翻译」判定（原文中文 >20 字且译文中文字 <10%）。④**丙 占位符保护** `Q_PROT_RE`+`protectList()`——网址/邮箱/\`代码\`/（1）（2）编号，译文丢一个扣 4 分并点名。⑤**丁 风格简报** `TONE_BRIEF`（学术严谨/专业可读/大众科普/文学性/口语化 各 5 条）+ `showToneBrief()`。⑥**一键体检** `auditAll()` 按开关聚合各项、每行带「看细节」按函数名字符串跳回原面板。选项存 `tp.auditOpts`。⚠️ **开发坑**：新模块里两次把 `$$` 写成 `$`（querySelector 返回单元素，没有 `.forEach`），导致页面一开就报错、连带 `let TRI_INLINE_ON` 的 TDZ 错误——**绑定多个元素一律用 `$$`**。测试 `tests/43-audit-center.js` 13 断言；`_check` bad=0（js=13）、全量 **42/42 全绿**。版本号 = 4.36.0
 
 ## 七、测试方式
 
@@ -169,12 +183,9 @@ node tests/14-backup.js             # 跑某个测试（需 playwright-core）
 
 | 优先级 | 功能 | 可行度 |
 |---|---|---|
-| 🥈 P2 | 修订对照三栏逐句视图（现在是改动片段对照） | 中 |
-| 🥈 P2 | 三段流水线（翻译→批评→精修） | 中 |
-| 🥉 P3 | 使用指南加「效果演示」 | 高 |
 | 🥉 P3 | 团队审校留痕 / 真·云端协作 | 低（大工程，暂缓）|
 
-> ✅ 已完成：P1 导回 Word 修订模式（v4.23.0）、P1 翻译记忆模糊匹配（v4.23.0）、P2 多模型预设（v4.23.0）、3 秒开屏/工具栏分组/疑难标注（v4.24.0）。
+> ✅ 已完成：P1 导回 Word 修订模式（v4.23.0）、P1 翻译记忆模糊匹配（v4.23.0）、P2 多模型预设（v4.23.0）、3 秒开屏/工具栏分组/疑难标注（v4.24.0）、使用指南效果演示（v4.25.2）、三段流水线（v4.29.0）、修订对照三栏逐句视图（v4.30.0）、段落对齐体检 🧩（v4.31.0，六机制 M3 / T-011）、术语已批准分级 ✅（v4.32.0，六机制 M4 / T-012）、数字与格式体检 🔢（v4.33.0，待办统一清单第 1 项 / T-015）、三段流水线卡死修复 ⚙（v4.34.0）、三栏对照提速 + 翻译区直出 📊（v4.35.0）、体检中心 🩺 + 译文总评分 📊 + 风格简报 🎛（v4.36.0，甲乙丙丁四功能）。
 
 ## 十、关于"对话记录"
 

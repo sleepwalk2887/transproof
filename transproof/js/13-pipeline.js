@@ -5,7 +5,7 @@
      · 批评段输入白名单 = 原文 + 译稿 + 术语表，禁带任何翻译段的「自辩/理由」（T-010）。
      · 批评段只产问题清单，不直接改译文；改译永远在第三段精修。
      · 任一段失败给可读提示，不静默吞。 */
-const PL = { stage: 0, draft: '', critique: '', final: '', running: false, cancel: false };
+const PL = { stage: 0, draft: '', critique: '', final: '', running: false, cancel: false, ctrl: null };
 
 /* 术语表（白名单要件，供批评/精修段锁定一致） */
 function plTerms(){
@@ -111,6 +111,8 @@ async function plRun(n){
   if(n > 2 && !PL.critique){ toast('请先完成第 2 段（批评清单）', 'w'); return; }
 
   PL.running = true; PL.cancel = false;
+  const ctrl = new AbortController();   /* 运行凭证 + 可立即中断 */
+  PL.ctrl = ctrl;
   const nx = $('#pl-next'); nx.disabled = true;
   const stop = $('#pl-stop'); stop.disabled = false;
   const label = ['','翻译初稿','批评清单','精修译文'][n];
@@ -124,14 +126,16 @@ async function plRun(n){
   else { sys = plSysRefine(); user = plUserRefine(); maxTok = 8000; }
 
   try{
-    const r = await callModelSimple(sys, user, maxTok);
-    if(PL.cancel){ plStatus('⏹ 已中断第 ' + n + ' 段。'); nx.disabled = false; stop.disabled = true; PL.running = false; return; }
+    const r = await callModelSimple(sys, user, maxTok, ctrl.signal);
+    if(PL.ctrl !== ctrl) return;   /* 弹窗被关/重开过：丢弃过期结果，别覆盖新一轮状态 */
+    if(PL.cancel || ctrl.signal.aborted){ plStatus('⏹ 已中断第 ' + n + ' 段，点下方按钮可重试本段。'); nx.disabled = false; nx.textContent = '↻ 重试第 ' + n + ' 段'; return; }
     let t = String((r && r.text) || '').trim();
     t = t.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/,'').trim(); // 剥代码围栏
     if(!t){ throw new Error('模型返回为空'); }
     if(n === 1) PL.draft = t;
     else if(n === 2) PL.critique = t;
     else PL.final = t;
+    PL.stage = n;   /* v4.34.0：只有真正跑完才推进段号——失败/中断永远重跑同一段 */
 
     plSetBox(t);
     plStatus('✓ 第 ' + n + ' 段「' + label + '」完成 · ' + new Date().toLocaleTimeString('zh-CN'));
@@ -141,25 +145,37 @@ async function plRun(n){
     else if(n === 2){ nx.textContent = '▶ 下一段：第 3 段（按批评精修）'; nx.disabled = false; }
     else { nx.textContent = '✓ 三段全部完成'; nx.disabled = true; $('#pl-send').disabled = false; }
   }catch(err){
+    if(PL.ctrl !== ctrl) return;   /* 弹窗被关/重开过：旧报错别打扰新一轮 */
+    if(PL.cancel || ctrl.signal.aborted){   /* 主动中断不算失败 */
+      plStatus('⏹ 已中断第 ' + n + ' 段，点下方按钮可重试本段。');
+      nx.disabled = false; nx.textContent = '↻ 重试第 ' + n + ' 段'; stop.disabled = true;
+      return;
+    }
     const msg = errMsg(err);
     plStatus('✗ 第 ' + n + ' 段「' + label + '」失败：' + msg);
-    plSetBox('【第 ' + n + ' 段失败】' + msg + '\n\n可以点「重试本段」再试一次，或先检查「设置」页的接口地址 / 模型 / API Key。');
+    plSetBox('【第 ' + n + ' 段失败】' + msg + '\n\n点下方按钮重试本段，或先检查「设置」页的接口地址 / 模型 / API Key。');
     nx.disabled = false; nx.textContent = '↻ 重试第 ' + n + ' 段';
     toast('第 ' + n + ' 段失败：' + msg, 'e');
+    if(typeof fbAutoReport === 'function') fbAutoReport('三段流水线第 ' + n + ' 段失败', msg);   /* v4.34.0 自动上报 */
   }finally{
-    PL.running = false; stop.disabled = true;
+    if(PL.ctrl === ctrl){ PL.running = false; stop.disabled = true; PL.ctrl = null; }
   }
 }
 
 function plOpen(){
   if(PL_RUNNING_GUARD()) return;
+  /* v4.34.0：重开弹窗先掐掉上次残留的调用并清 running，否则整块功能卡死 */
+  if(PL.ctrl){ PL.cancel = true; try{ PL.ctrl.abort(); }catch(_){} }
+  PL.running = false; PL.ctrl = null; PL.cancel = false;
   PL.stage = 0; PL.draft = ''; PL.critique = ''; PL.final = '';
   modal('⚙ 三段流水线 · 翻译 → 批评 → 精修', plHtml());
   plStep(0);
   $('#pl-next').onclick = () => {
-    PL.stage = (PL.stage || 0) + 1;
-    if(PL.stage > 3){ return; }
-    plRun(PL.stage).then(() => { /* stage 已在 plRun 内推进 */ });
+    if(PL.running) return;
+    /* v4.34.0：段号由「已完成的内容」推导——失败/中断后重试永远重跑同一段，绝不会越位卡死；
+       PL.stage 只在 plRun 真正跑完后才推进（stage = 已完成到第几段，失败不前进） */
+    const n = !PL.draft ? 1 : (!PL.critique ? 2 : 3);
+    plRun(n);
   };
   $('#pl-copy').onclick = () => { const t = plCur(); if(t){ navigator.clipboard.writeText(t).then(() => toast('已复制当前产物')).catch(() => toast('复制失败，请手动选中', 'e')); } };
   $('#pl-send').onclick = () => {
@@ -167,8 +183,17 @@ function plOpen(){
     $('#dst').value = PL.final; closeModal(); toast('精修译文已填入校对页，可点「开始校对」');
     document.querySelector('nav button[data-page="p-work"]').click();
   };
-  $('#pl-stop').onclick = () => { PL.cancel = true; };
-  $('#pl-close').onclick = () => closeModal();
+  $('#pl-stop').onclick = () => {   /* v4.34.0：立刻掐断网络请求，不再干等超时 */
+    PL.cancel = true;
+    if(PL.ctrl){ try{ PL.ctrl.abort(); }catch(_){} }
+    plStatus('⏹ 正在中断…');
+  };
+  $('#pl-close').onclick = () => {   /* v4.34.0：关闭=取消本段，后台不再偷偷跑，重开能重新开始 */
+    PL.cancel = true;
+    if(PL.ctrl){ try{ PL.ctrl.abort(); }catch(_){} }
+    PL.running = false; PL.ctrl = null;
+    closeModal();
+  };
 }
 function PL_RUNNING_GUARD(){ return false; } /* 预留：与主翻译互斥的守卫位 */
 

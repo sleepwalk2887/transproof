@@ -635,6 +635,439 @@ function showTermAudit(){
   }
 }
 
+/* ═══════════ 段落对齐体检（v4.31.0 · M3/T-011 · 零 token）═══════════
+   原文与译文的段落序列机械比对（纯本地，不调 AI、不花 token）：
+   ① 段数相等 → 逐段一一对应；
+   ② 译文段数少 → 缺段：标出译文里没有对应段落的原文位置；
+   ③ 译文段数多 → 多段：标出原文里没有对应段落的译文位置；
+   ④ 译文中夹着整段空白 → 空段：多半是这一段整个漏掉了。
+   段落切分与「三栏对照」同口径（按空行切），两边判法一致。 */
+function paraAudit(srcText, dstText){
+  const raw = t => String(t || '').replace(/\r/g, '').split(/\n{2,}/).map(s => s.trim());
+  const trimEnds = arr => {              // 只剥首尾空壳；中间的空段留着——那是漏译现场
+    const a = arr.slice();
+    while(a.length && !a[0]) a.shift();
+    while(a.length && !a[a.length - 1]) a.pop();
+    return a;
+  };
+  const sp = trimEnds(raw(srcText)), dp = trimEnds(raw(dstText));
+  const blanks = [];
+  dp.forEach((p, i) => { if(!p) blanks.push(i + 1); });   // 译文整段空白的位置（从 1 数起）
+  const s = sp.filter(Boolean), d = dp.filter(Boolean);
+  const srcN = s.length, dstN = d.length;
+  const status = dstN === srcN ? 'equal' : (dstN < srcN ? 'short' : 'long');
+  const rows = [], n = Math.max(srcN, dstN);
+  for(let i = 0; i < n; i++){
+    rows.push({
+      i: i + 1,
+      src: i < srcN ? s[i] : '',
+      dst: i < dstN ? d[i] : '',
+      kind: i >= dstN ? 'missing' : (i >= srcN ? 'extra' : 'ok')
+    });
+  }
+  return {
+    srcN, dstN, diff: dstN - srcN, status, blanks,
+    srcParas: sp,
+    missing: rows.filter(r => r.kind === 'missing'),
+    extra: rows.filter(r => r.kind === 'extra')
+  };
+}
+
+function showParaAudit(){
+  const srcText = $('#src').value.trim();
+  const dstText = extractProofText(LAST_OUT) || $('#dst').value.trim();
+  if(!srcText){ toast('请先粘贴原文，再做段落对齐体检', 'e'); return; }
+  if(!dstText){ toast('请先校对，或粘贴待核对的译文，再做段落对齐体检', 'e'); return; }
+  const r = paraAudit(srcText, dstText);
+  const cut = (t, n) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > n ? x.slice(0, n) + '…' : x; };
+  const clean = r.status === 'equal' && !r.blanks.length;
+  const parts = [];
+  parts.push('<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--tx2);margin-bottom:14px">' +
+    '<span>原文 <b>' + r.srcN + '</b> 段</span>' +
+    '<span>译文 <b>' + r.dstN + '</b> 段</span>' +
+    '<span>相差 <b style="color:var(--' + (r.diff ? 'err' : 'ok') + ')">' + (r.diff > 0 ? '+' : '') + r.diff + '</b> 段</span>' +
+    '<span>判定 <b style="color:var(--' + (clean ? 'ok' : 'err') + ')">' +
+      (r.status === 'equal' ? (clean ? '✓ 对齐' : '⚠ 空段') : (r.status === 'short' ? '⚠ 缺段' : '⚠ 多段')) + '</b></span></div>');
+  if(clean){
+    parts.push('<div class="alert ok">✓ 段落对齐：原文与译文都是 ' + r.srcN + ' 段，逐段一一对应，未发现缺段/多段/空段。</div>');
+  }
+  if(r.status === 'short'){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 译文比原文少 ' + (r.srcN - r.dstN) + ' 段（疑似漏译，或被并进了上一段）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">下列原文段落在译文里没有对应的段落，位置已按序号标出，请核对是整段漏了还是被合并了。</div>');
+    parts.push(r.missing.map(x => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">位置：原文第 ' + x.i + ' 段 → 译文没有对应段落</div>' +
+      '原文：' + esc(cut(x.src, 160)) + '</div>').join(''));
+  }
+  if(r.status === 'long'){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 译文比原文多 ' + (r.dstN - r.srcN) + ' 段</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">下列译文段落在原文里找不到对应，多半是被拆开或模型多写了，请核对。</div>');
+    parts.push(r.extra.map(x => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">位置：译文第 ' + x.i + ' 段 → 原文没有对应段落</div>' +
+      '译文：' + esc(cut(x.dst, 160)) + '</div>').join(''));
+  }
+  if(r.blanks.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 译文里有 ' + r.blanks.length + ' 段是空的</h4>');
+    parts.push(r.blanks.map(b => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">位置：译文第 ' + b + ' 段是空的（这一段很可能整个漏了）</div>' +
+      (r.srcParas[b - 1] ? '原文：' + esc(cut(r.srcParas[b - 1], 160)) : '') + '</div>').join(''));
+  }
+  parts.push('<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">' +
+    '<button class="btn gray sm" id="para-close">关闭</button>' +
+    '<span style="font-size:12px;color:var(--tx3)">本地比对 · 不调 AI · 不花 token</span></div>');
+  modal('🧩 段落对齐体检', parts.join(''));
+  $('#para-close').onclick = closeModal;
+}
+
+/* ═══════════ 数字与格式体检（T-015 · v4.33.0 · 本地零流量）══════════
+    机械比对，只报可疑不下死刑：①数字丢失/被改 ②译文凭空多出 ③百分号丢失
+    ④疑似漏否定（段数对齐时逐段查，对不齐退化为总量对比）。
+    「1,500 → 1.5万」这类万/亿换算自动配对抵消，不误报。 */
+function numAudit(srcText, dstText){
+  srcText = String(srcText || ''); dstText = String(dstText || '');
+  const toHalf = s => String(s || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 65248)).replace(/．/g, '.').replace(/，/g, ',').replace(/％/g, '%');
+  const S = toHalf(srcText), D = toHalf(dstText);
+  const digits = t => (t.match(/(?<![\w.])-?\d[\d,]*(?:\.\d+)?/g) || []).map(x => x.replace(/[,%]/g, ''));
+  const count = arr => { const m = {}; arr.forEach(x => { m[x] = (m[x] || 0) + 1; }); return m; };
+  const srcNums = digits(S), dstNums = digits(D);
+  const srcM = count(srcNums), dstM = count(dstNums);
+  const interesting = n => (n.match(/\d/g) || []).length >= 2;
+  const snippet = (t, tok) => {
+    const i = t.indexOf(tok);
+    if(i < 0) return '';
+    const a = Math.max(0, i - 24), b = Math.min(t.length, i + tok.length + 24);
+    return (a > 0 ? '…' : '') + t.slice(a, b).replace(/\s+/g, ' ') + (b < t.length ? '…' : '');
+  };
+  const missing = [], extra = [];
+  Object.keys(srcM).forEach(n => {
+    if(!interesting(n)) return;
+    if((dstM[n] || 0) < srcM[n]) missing.push({ n, sc: srcM[n], dc: dstM[n] || 0, ctx: snippet(S, n) });
+  });
+  Object.keys(dstM).forEach(n => {
+    if(!interesting(n)) return;
+    if((srcM[n] || 0) < dstM[n]) extra.push({ n, sc: srcM[n] || 0, dc: dstM[n], ctx: snippet(D, n) });
+  });
+  const isWan = (a, b) => {
+    if(!(a > 0) || !(b > 0)) return false;
+    const t = Math.max(0.01, a * 0.005);
+    return Math.abs(b * 10000 - a) <= t || Math.abs(a * 10000 - b) <= t ||
+           Math.abs(b * 1e8 - a) <= t || Math.abs(a * 1e8 - b) <= t;
+  };
+  const usedE = new Set();
+  missing.forEach(m => {
+    if(m.dc !== 0) return;
+    for(let i = 0; i < extra.length; i++){
+      const e = extra[i];
+      if(e.sc !== 0 || usedE.has(i)) continue;
+      if(isWan(parseFloat(m.n), parseFloat(e.n))){ m.wan = true; e.wan = true; usedE.add(i); break; }
+    }
+  });
+  const missR = missing.filter(x => !x.wan);
+  const extraR = extra.filter(x => !x.wan);
+  const pctSrc = (S.match(/\d+(?:\.\d+)?\s*%/g) || []).length;
+  const pctDst = (D.match(/\d+(?:\.\d+)?\s*%/g) || []).length;
+  const pctZh = (D.match(/百分之/g) || []).length;
+  const pctLost = pctSrc > 0 && pctDst === 0 && pctZh === 0 && !missR.some(m => srcM[m.n + '%'] !== undefined);
+  const paras = t => String(t || '').replace(/\r/g, '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
+  const NEG_EN = /\b(?:not|no|never|neither|nor|n't|without|nobody|nothing|nowhere|cannot|can't|won't|don't|doesn't|didn't|isn't|aren't|wasn't|weren't|hasn't|haven't|hadn't)\b/i;
+  const NEG_ZH = /[不没无非未]/;
+  const negOf = t => NEG_EN.test(t) || NEG_ZH.test(t);
+  const sp = paras(srcText), dp = paras(dstText);
+  const negDiff = [];
+  if(sp.length && sp.length === dp.length){
+    sp.forEach((p, i) => { if(negOf(p) && !negOf(dp[i])) negDiff.push({ i: i + 1, src: p, dst: dp[i] }); });
+  }
+  const negCount = t => ((String(t).match(/\b(?:not|no|never|neither|nor)\b|n't/gi) || []).length + (String(t).match(/[不没无非未]/g) || []).length);
+  const negLoose = negDiff.length === 0 && negCount(srcText) > negCount(dstText) + 1;
+  const issueCount = missR.length + extraR.length + (pctLost ? 1 : 0) + negDiff.length + (negLoose ? 1 : 0);
+  return {
+    srcNumCount: srcNums.length, dstNumCount: dstNums.length,
+    missing: missR.slice(0, 12), extra: extraR.slice(0, 12),
+    pctLost, pctSrc, negDiff: negDiff.slice(0, 8), negLoose,
+    negSrc: negCount(srcText), negDst: negCount(dstText),
+    issueCount, clean: issueCount === 0
+  };
+}
+
+function showNumAudit(){
+  const srcText = $('#src').value.trim();
+  const dstText = extractProofText(LAST_OUT) || $('#dst').value.trim();
+  if(!srcText){ toast('请先粘贴原文，再做数字体检', 'e'); return; }
+  if(!dstText){ toast('请先校对，或粘贴待核对的译文，再做数字体检', 'e'); return; }
+  const r = numAudit(srcText, dstText);
+  const cut = (t, n) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > n ? x.slice(0, n) + '…' : x; };
+  const parts = [];
+  parts.push('<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--tx2);margin-bottom:14px">' +
+    '<span>原文数字 <b>' + r.srcNumCount + '</b> 个</span>' +
+    '<span>译文数字 <b>' + r.dstNumCount + '</b> 个</span>' +
+    '<span>可疑 <b style="color:' + (r.issueCount ? 'var(--err)' : 'var(--tx2)') + '">' + r.issueCount + '</b> 处</span>' +
+    '<span>判定 <b style="color:' + (r.clean ? 'var(--tx2)' : 'var(--err)') + '">' + (r.clean ? '✓ 未见异常' : '⚠ 需人工复核') + '</b></span></div>');
+  if(r.clean){
+    parts.push('<div class="alert ok">✓ 数字与格式体检：原文 ' + r.srcNumCount + ' 个数字在译文里都能对上，百分号与否定词也未见异常。</div>');
+  }
+  if(r.missing.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 丢失 / 被改动的数字 ' + r.missing.length + ' 个（原文有、译文对不上）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">译文里找不到这个数字，或出现次数变少。万/亿换算已自动抵消，仍列在这里的请逐个核对。</div>');
+    parts.push(r.missing.map(x => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">数字 <b>' + esc(x.n) + '</b>：原文出现 ' + x.sc + ' 次，译文 ' + x.dc + ' 次</div>' +
+      (x.ctx ? '原文上下文：' + esc(cut(x.ctx, 120)) : '') + '</div>').join(''));
+  }
+  if(r.extra.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 译文凭空多出的数字 ' + r.extra.length + ' 个（原文没有）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">原文里没有这个数字，多半是模型编造或换算产生的。</div>');
+    parts.push(r.extra.map(x => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">数字 <b>' + esc(x.n) + '</b>：译文出现 ' + x.dc + ' 次，原文 ' + x.sc + ' 次</div>' +
+      (x.ctx ? '译文上下文：' + esc(cut(x.ctx, 120)) : '') + '</div>').join(''));
+  }
+  if(r.pctLost){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 百分号疑似丢失</h4>' +
+      '<div class="seg" style="font-size:13px">原文有 ' + r.pctSrc + ' 处百分比（%），译文里数字还在，却既没有 % 也没有「百分之」，请核对。</div>');
+  }
+  if(r.negDiff.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 疑似漏否定 ' + r.negDiff.length + ' 处（逐段核对）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">原文这一段有否定（not / 不 / 无 / 未…），对应译文段落里却一个否定词都没有——「有」译成「没有」是致命反义。</div>');
+    parts.push(r.negDiff.map(x => '<div class="seg" style="font-size:13px">' +
+      '<div style="color:var(--err);margin-bottom:4px">位置：第 ' + x.i + ' 段</div>' +
+      '原文：' + esc(cut(x.src, 100)) + '<br>译文：' + esc(cut(x.dst, 100)) + '</div>').join(''));
+  }
+  if(r.negLoose){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 否定词总量明显变少（原文 ' + r.negSrc + ' 个 / 译文 ' + r.negDst + ' 个）</h4>' +
+      '<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">段落数对不齐没法逐段定位，只能给总量：建议通读一遍，确认没有把「不」译丢。</div>');
+  }
+  parts.push('<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">' +
+    '<button class="btn gray sm" id="num-close">关闭</button>' +
+    '<span style="font-size:12px;color:var(--tx3)">本地机械比对 · 不调 AI · 不花 token · 只报可疑，以人工复核为准</span></div>');
+  modal('🔢 数字与格式体检', parts.join(''));
+  $('#num-close').onclick = closeModal;
+}
+
+/* ═══════════ 体检中心 + 译文总评分 + 风格简报（v4.36.0 · 本地零 token）═══════════
+   总分框架借鉴 dsh-plugin-translation（MIT）的 quality：它给译文打 0–100 分，
+   我们这里把已有的各项体检汇成同一个总分，刻度与「质量预估」一致（0–100 + S/A/B/C/D）。 */
+
+function qLevel(s){ return s >= 90 ? 'S' : s >= 85 ? 'A' : s >= 70 ? 'B' : s >= 50 ? 'C' : 'D'; }
+function qColor(s){ return s >= 85 ? 'var(--ok)' : s >= 70 ? '#d4a72c' : s >= 50 ? '#d4882c' : 'var(--err)'; }
+
+/* ── 丙：占位符保护 —— URL / 邮箱 / 代码 /（1）（2）编号，被译错改坏都是硬伤 ── */
+const Q_PROT_RE = /https?:\/\/[^\s，。；、）」』]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\`[^\`\n]{1,80}\`|(?:（|\()\s*\d{1,3}\s*(?:）|\))/g;
+function protectList(t){
+  const m = String(t || '').match(Q_PROT_RE) || [];
+  return [...new Set(m.map(x => x.trim()))];
+}
+
+/* ── 甲乙丙：译文总评分（忠实度 60 起 + 流畅度 40 起，每条扣分写清扣在哪）── */
+function qualityScore(srcText, dstText){
+  const src = String(srcText || ''), dst = String(dstText || '');
+  const items = [];
+  if(!src.trim() || !dst.trim()){
+    return { ok:false, score:0, level:'D', fidelity:0, fluency:0, ratio:0, items:[], clean:false,
+             text:'原文和译文都要填，才能打分' };
+  }
+  let fidelity = 60, fluency = 40;
+  const add = (pen, cat, detail) => { items.push({ cat, detail, pen }); };
+
+  if(typeof numAudit === 'function'){            // 数字 / 百分号 / 否定词（含万、亿换算）
+    const na = numAudit(src, dst);
+    const nMiss = (na.missing || []).length, nExtra = (na.extra || []).length;
+    const nPct = na.pctLost ? 1 : 0, nNeg = (na.negDiff || []).length;
+    if(nMiss + nExtra + nPct + nNeg){
+      const pen = Math.min(24, nMiss * 5 + nExtra * 5 + nPct * 5 + nNeg * 6);
+      fidelity -= pen;
+      const b = [];
+      if(nMiss) b.push('丢了 ' + nMiss + ' 个');
+      if(nExtra) b.push('凭空多出 ' + nExtra + ' 个');
+      if(nPct) b.push('百分号丢了');
+      if(nNeg) b.push('漏了 ' + nNeg + ' 处否定');
+      add(pen, '数字与格式', b.join('、'));
+    }
+  }
+  if(typeof paraAudit === 'function'){           // 段落对齐（整段漏译）
+    const pa = paraAudit(src, dst);
+    const blanks = (pa.blanks || []).length;
+    if(pa.status !== 'equal' || blanks){
+      const pen = Math.min(14, Math.abs(pa.diff || 0) * 3 + blanks * 4);
+      fidelity -= pen;
+      add(pen, '段落对齐', pa.status === 'short' ? ('原文比译文多 ' + Math.abs(pa.diff) + ' 段，疑似整段漏译')
+        : (pa.status === 'long' ? ('译文比原文多 ' + pa.diff + ' 段') : ('有 ' + blanks + ' 个空段')));
+    }
+  }
+  if(typeof approvedGloss === 'function'){       // 术语只认「已批准」（M4 权威分级）
+    const miss = approvedGloss().filter(g => g.foreign && src.indexOf(g.foreign) >= 0 && g.zh && dst.indexOf(g.zh) < 0);
+    if(miss.length){
+      const pen = Math.min(18, miss.length * 6);
+      fidelity -= pen;
+      add(pen, '术语未按权威库', miss.slice(0, 5).map(g => g.foreign + '→' + g.zh).join('、'));
+    }
+  }
+  const pDst = protectList(dst);
+  const pLost = protectList(src).filter(x => pDst.indexOf(x) < 0);   // 丙
+  if(pLost.length){
+    const pen = Math.min(12, pLost.length * 4);
+    fidelity -= pen;
+    add(pen, '占位符保护', pLost.slice(0, 4).join('、') + ' 在译文里没了或被改');
+  }
+  const srcCjk = /[\u4e00-\u9fff]/.test(src);   // 乙：漏译残留 —— 原文是中文
+  const cjkCount = (dst.match(/[\u4e00-\u9fff]/g) || []).length;
+  const runs = dst.match(/[A-Za-z][A-Za-z'\u2019-]{3,}(?:\s+[A-Za-z][A-Za-z'\u2019-]{2,}){2,}/g) || [];
+  if(srcCjk && cjkCount / Math.max(1, dst.length) < 0.1){
+    fidelity -= 12;
+    add(12, '译文几乎没翻译', '原文是中文，译文里中文字只有 ' + cjkCount + ' 个，疑似整篇没翻');
+  } else if(cjkCount > 0 && runs.length){
+    const pen = Math.min(10, runs.length * 5);
+    fidelity -= pen;
+    add(pen, '未翻译残留', '「' + runs[0].slice(0, 32) + '」等 ' + runs.length + ' 处没翻干净');
+  }
+  const ratio = dst.length / Math.max(1, src.length);
+  if(ratio < 0.4 || ratio > 3){
+    fidelity -= 8;
+    add(8, '长度比异常', '译文/原文 = ' + ratio.toFixed(2) + (ratio < 0.4 ? '（偏短，可能漏译）' : '（偏长，可能过度翻译）'));
+  }
+
+  const sentCount = t => String(t).split(/[.!?。！？…]+/).filter(x => x.trim().length > 0).length;
+  const sN = sentCount(src), tN = sentCount(dst);
+  if(sN > 0 && Math.abs(sN - tN) / sN > 0.5){
+    fluency -= 8;
+    add(8, '句数不匹配', '原文 ' + sN + ' 句 / 译文 ' + tN + ' 句');
+  }
+  const dbl = (dst.match(/[，。、；：,.;:]{2,}|\u3000{2,}|[ \t]{2,}/g) || []).length;
+  if(dbl){
+    const pen = Math.min(12, dbl * 4);
+    fluency -= pen;
+    add(pen, '重复标点/空格', dbl + ' 处');
+  }
+  if(dst.split(/[.!?。！？]+/).some(s2 => s2.trim().length > 200)){
+    fluency -= 6;
+    add(6, '超长句', '有句子超过 200 字，建议拆开');
+  }
+
+  fidelity = Math.max(0, fidelity); fluency = Math.max(0, fluency);
+  const score = Math.max(0, Math.min(100, fidelity + fluency));
+  return { ok:true, score, level:qLevel(score), fidelity, fluency,
+           ratio:Math.round(ratio * 100) / 100, items, clean:items.length === 0,
+           text:'忠实度 ' + fidelity + '/60 · 流畅度 ' + fluency + '/40' };
+}
+
+function showQuality(){
+  const src = (($('#src') || {}).value || '').trim();
+  const dst = (typeof extractProofText === 'function' ? extractProofText(LAST_OUT) : '') || (($('#dst') || {}).value || '').trim();
+  if(!src || !dst){ toast('原文和译文都要有，才能打分', 'e'); return; }
+  const q = qualityScore(src, dst);
+  const color = qColor(q.score);
+  const chip = 'display:inline-block;padding:3px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--bd);font-size:12px;color:var(--tx2)';
+  const head = [
+    '<div style="display:flex;gap:16px;align-items:center;margin-bottom:12px">',
+    '  <div style="flex:0 0 88px;width:88px;height:88px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:4px solid ' + color + ';color:' + color + '">',
+    '    <div style="font-size:26px;font-weight:700;line-height:1">' + q.score + '</div>',
+    '    <div style="font-size:11px;opacity:.85">' + esc(q.level) + '</div>',
+    '  </div>',
+    '  <div style="flex:1;min-width:0">',
+    '    <div style="font-size:13px;line-height:1.6;color:var(--tx1)">' + esc(q.text) + '</div>',
+    '    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">',
+    '      <span style="' + chip + '">长度比 ' + q.ratio + '</span>',
+    '      <span style="' + chip + '">扣分项 ' + q.items.length + ' 条</span>',
+    '    </div>',
+    '  </div>',
+    '</div>'
+  ].join('');
+  const list = q.items.length
+    ? '<div><b style="font-size:12.5px;color:var(--tx2)">扣分明细（本地算的，条条可复核）</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.7;color:var(--tx1)">'
+      + q.items.map(it => '<li><b style="color:var(--err)">-' + it.pen + '</b> 【' + esc(it.cat) + '】' + esc(it.detail) + '</li>').join('')
+      + '</ul></div>'
+    : '<div class="alert ok">✓ 没查出数字丢失、整段漏译、术语不符、占位符被改、未翻译残留这类硬伤。</div>';
+  const hint = '<div class="alert i" style="margin-top:12px">这是纯本地机械体检：只查「规则能确认」的硬伤，不判断文笔好坏。要更完整的判断点「开始校对」。</div>';
+  modal('📊 译文总评分', head + list + hint);
+}
+
+/* ── 丁：风格简报（按上方选的体裁调性给一份可执行清单）── */
+const TONE_BRIEF = {
+  '学术严谨': ['保留长句结构与理论密度，不要为了顺口擅自拆句。', '术语首次出现可在括号里留外文原词，之后统一用中文译名。', '限定语（可能、在某种程度上、通常）不要删——那是学术判断的分寸。', '引用与脚注编号逐字核对，一个都不能错。', '被动语态在强调动作对象时保留，不必都改成主动。'],
+  '专业可读': ['准确优先，其次顺畅；拿不准的术语宁可保留原词。', '长句先断成两到三句，但别把因果关系拆散。', '数字、单位、专有名词逐字核对。', '避免「进行……的……」这类空转的机器腔结构。', '段落之间补一句承上启下，别让读者自己猜。'],
+  '大众科普': ['术语第一次出现就用一句大白话解释，别直接堆名词。', '句子尽量短，一句只说一件事。', '用类比和具体例子代替抽象定义。', '专业词能换成人话就换，非留不可的加括号注释。', '别为了通俗牺牲准确——宁可说「大致相当于」也不要瞎类比。'],
+  '文学性': ['保留原文的节奏、停顿和句长变化，别都抹平成一样长。', '修辞（比喻、排比、反复）一定要译出来，那是文章的骨架。', '说话人的语气、口癖要留住，别都改成标准书面语。', '留白和跳跃是作者有意为之，别擅自补全。', '拿不准的地方保留歧义，别强行选一个解释。'],
+  '口语化': ['用说话的词，不用书面词（「所以」而不是「因此」）。', '可以有语气词、可以有省略、可以有不完整的句子。', '短句为主，节奏跟上人的语速。', '俗语俚语优先找中文里说法对应的，别直译。', '别加原文没有的客套和解释——口语是直接的。']
+};
+function toneBriefFor(tone){ return TONE_BRIEF[tone] || TONE_BRIEF['专业可读']; }
+function showToneBrief(){
+  const tone = (($('#tone') || {}).value || '专业可读');
+  const items = toneBriefFor(tone);
+  modal('🎛 风格简报 · ' + esc(tone),
+    '<div class="alert i">按你选的「' + esc(tone) + '」给的检查清单——翻译和校对时照着走。换上方下拉框再点一次可换一份。</div>'
+    + '<ul style="margin:12px 0 0 18px;font-size:13px;line-height:1.8;color:var(--tx1)">' + items.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>'
+    + '<div class="hint" style="margin-top:12px">清单跟着「体裁调性」一起进校对提示词，不额外花 token。</div>');
+}
+
+/* ── 体检中心：开关 + 一键全检 ── */
+const AO_KEY = 'tp.auditOpts';
+function auditOptsGet(){
+  const d = { term:true, pnoun:true, para:true, num:true, quality:true, tone:false };
+  const s = load(AO_KEY, null);
+  return (s && typeof s === 'object') ? Object.assign(d, s) : d;
+}
+function auditOptsApply(){
+  const o = auditOptsGet();
+  Object.keys(o).forEach(k => { const el = $('#ao-' + k); if(el) el.checked = !!o[k]; });
+}
+function auditOptsSave(){
+  const o = {};
+  Object.keys(auditOptsGet()).forEach(k => { const el = $('#ao-' + k); if(el) o[k] = !!el.checked; });
+  save(AO_KEY, o);
+}
+function auditCenterToggle(on){
+  const box = $('#audit-center'), btn = $('#btn-audit-center');
+  const vis = (typeof on === 'boolean') ? on : (box && box.style.display === 'none');
+  if(box) box.style.display = vis ? '' : 'none';
+  if(btn) btn.classList.toggle('vs-on', !!vis);
+  if(vis) auditOptsApply();
+}
+
+function auditAll(){
+  const src = (($('#src') || {}).value || '').trim();
+  const dst = (($('#dst') || {}).value || '').trim();
+  const proof = (typeof extractProofText === 'function' ? extractProofText(LAST_OUT) : '') || '';
+  const target = proof || dst;
+  if(!target){ toast('先把译文贴进译文框，才能体检', 'e'); return; }
+  const o = auditOptsGet();
+  const rows = [];
+  const add = (name, n, detail, opener) => rows.push({ name, n, detail, opener });
+  if(o.term && typeof termAudit === 'function'){
+    const r = termAudit(target, src);
+    add('术语一致性', (r.conflict || []).length + (r.multi || []).length, '冲突 / 一词多译', 'showTermAudit');
+  }
+  if(o.pnoun && typeof proNounAudit === 'function'){
+    add('专名一致性', (proNounAudit(target, src) || []).length, '同名异译 / 疑似未译 / 数字', 'pnOpen');
+  }
+  if(o.para && typeof paraAudit === 'function'){
+    const r = paraAudit(src, target);
+    const n = r.status === 'equal' ? 0 : Math.abs(r.diff || 0) + (r.blanks || []).length;
+    add('段落对齐', n, r.status === 'equal' ? '段落数一致' : '段落数对不上（疑似漏段）', 'showParaAudit');
+  }
+  if(o.num && typeof numAudit === 'function'){
+    const r = numAudit(src, target);
+    add('数字与格式', r.issueCount || 0, r.clean ? '干净' : '数字 / 百分号 / 否定词有可疑处', 'showNumAudit');
+  }
+  if(o.quality && typeof qualityScore === 'function'){
+    const q = qualityScore(src, target);
+    add('译文总评分', q.items.length, '总分 ' + q.score + '（' + q.level + '）· ' + q.text, 'showQuality');
+  }
+  if(o.tone) add('风格简报', 0, '按「' + (($('#tone') || {}).value || '专业可读') + '」给的清单', 'showToneBrief');
+
+  if(!rows.length){ toast('一项都没勾，请先在体检中心勾选', 'w'); return; }
+  const chip = 'display:inline-block;padding:3px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--bd);font-size:12px;color:var(--tx2)';
+  const bad = rows.filter(r => r.n > 0).length;
+  const head = '<div class="alert ' + (bad ? 'w' : 'ok') + '">共跑 ' + rows.length + ' 项：'
+    + (bad ? ('有 <b>' + bad + '</b> 项查出问题，下面逐项可点开看细节。') : '全部通过，没查出硬伤。') + '</div>';
+  const body = rows.map(r =>
+    '<div class="seg" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">'
+    + '<b style="min-width:96px">' + esc(r.name) + '</b>'
+    + '<span style="' + chip + '">' + (r.n ? ('<b style="color:var(--err)">' + r.n + '</b> 处') : '✓ 通过') + '</span>'
+    + '<span style="font-size:12px;color:var(--tx3)">' + esc(r.detail) + '</span>'
+    + '<span style="flex:1"></span>'
+    + '<button class="btn gray sm" data-aopen="' + esc(r.opener) + '">看细节</button>'
+    + '</div>').join('');
+  modal('🩺 体检中心 · 结果', head + body
+    + '<div class="hint" style="margin-top:12px">全部本地计算 · 不调 AI · 不花 token。「看细节」打开原来的体检面板，可逐条处理。</div>');
+  $$('#mBody [data-aopen]').forEach(b => { b.onclick = () => { const f = b.getAttribute('data-aopen'); if(typeof window[f] === 'function') window[f](); }; });
+}
+
 /* ═══════════ 智能配图助手（v4.4 关键词标签 · 图片来源待接）═══════════ */
 function parseImageTags(text){
   let s = String(text||'').replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
@@ -729,6 +1162,21 @@ $('#btn-img').onclick = () => {
 };
 // 术语一致性体检入口（本地零成本）
 $('#btn-audit').onclick = () => showTermAudit();
+// 段落对齐体检入口（v4.31.0 · 本地零成本）
+$('#btn-para-audit') && ($('#btn-para-audit').onclick = () => showParaAudit());
+// 数字与格式体检入口（T-015 · v4.33.0 · 本地零成本）
+$('#btn-num-audit') && ($('#btn-num-audit').onclick = () => showNumAudit());
+/* 体检中心 + 总评分 + 风格简报（v4.36.0） */
+$('#btn-audit-center') && ($('#btn-audit-center').onclick = () => auditCenterToggle());
+$('#btn-audit-center-close') && ($('#btn-audit-center-close').onclick = () => auditCenterToggle(false));
+$('#btn-audit-all') && ($('#btn-audit-all').onclick = auditAll);
+$('#btn-quality') && ($('#btn-quality').onclick = showQuality);
+$('#btn-tone') && ($('#btn-tone').onclick = showToneBrief);
+if(typeof $$ === 'function'){ $$('#audit-center .opts input[type=checkbox]').forEach(el => { el.onchange = auditOptsSave; }); }
+auditOptsApply();
+/* 三栏对照 · 翻译区直出（v4.35.0） */
+$('#btn-tri-inline') && ($('#btn-tri-inline').onclick = () => triInlineToggle());
+['#src', '#dst'].forEach(sel => { const el = $(sel); if(el) el.addEventListener('input', triInlineSchedule); });
 
 /* ═══════════ 改动对照视图（v4.12.0 · P1 · 零 token）═══════════
    把「二、逐条批注」的每一条 [类型] 原文 → 改为「新译」：理由
@@ -891,12 +1339,20 @@ function showVerifyResults(items, verdicts, opts){
         '<div style="font-size:12.5px;color:var(--tx2);margin-top:2px">' + esc(v.reason || '（模型没给依据）') + '</div>' +
         (sug && v.verdict !== 'ok' ? '<div style="font-size:12.5px;margin-top:2px">建议改为：<b style="color:var(--ac)">' + esc(sug) + '</b>' +
           ((opts && opts.onAdopt) ? ' <button class="btn sm" data-adopt style="vertical-align:middle">✓ 采用</button>' : '') + '</div>' : '') +
+        (v.verdict === 'ok' && opts && opts.onApprove ? '<div style="font-size:12.5px;margin-top:2px">判定正确，可一键批准为「已批准」 <button class="btn pri sm" data-approve style="vertical-align:middle">✓ 批准</button></div>' : '') +
       '</div>' +
       '<span style="font-size:11px;color:var(--tx3)">置信 ' + esc(v.conf || '?') + '</span>' +
     '</div>';
   }).join('');
   modal('🤖 收录核查结果',
     '<div style="font-size:12.5px;color:var(--tx2);margin-bottom:6px">AI 判定仅供参考，采纳前自己再过目一眼。' + (opts && opts.note ? esc(opts.note) : '') + '</div>' + rows);
+  if(opts && opts.onApprove){
+    $$('#mBody [data-approve]').forEach(b => b.onclick = () => {
+      const i = +b.closest('.vf-row').dataset.i;
+      opts.onApprove(i, verdicts.find(x => +x.i === i) || {});
+      b.textContent = '✓ 已批准'; b.disabled = true;
+    });
+  }
   if(opts && opts.onAdopt){
     $$('#mBody [data-adopt]').forEach(b => b.onclick = () => {
       const i = +b.closest('.vf-row').dataset.i;
@@ -1189,14 +1645,30 @@ function triSplitSents(p){
   return s.split(/(?<=[。！？!?…；;])/).map(x => x.trim()).filter(Boolean);
 }
 function triEscRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-function triMark(text, frags, cls){
+function triBuildRe(frags){
+  const uniq = [...new Set((frags || []).filter(f => f && String(f).length))].sort((a, b) => b.length - a.length);
+  if(!uniq.length) return null;
+  return new RegExp('(' + uniq.map(triEscRe).join('|') + ')', 'g');
+}
+function triHit(re, s){
+  if(!re || !s) return false;
+  re.lastIndex = 0;
+  return re.test(s);
+}
+/* re 可传入预先拼好的正则（v4.35.0 性能关键：不再每渲染一句就重拼一次大正则） */
+function triMark(text, frags, cls, re){
   const t = String(text || '');
   if(!t) return '';
-  const fs = (frags || []).filter(f => f && t.indexOf(f) >= 0);
-  if(!fs.length) return esc(t);
-  const uniq = [...new Set(fs)].sort((a, b) => b.length - a.length);
-  const re = new RegExp('(' + uniq.map(triEscRe).join('|') + ')', 'g');
-  return t.split(re).map((seg, i) => (i % 2) ? '<span class="' + cls + '">' + esc(seg) + '</span>' : esc(seg)).join('');
+  let useRe = re || null;
+  if(!useRe){
+    const fs2 = (frags || []).filter(f => f && t.indexOf(f) >= 0);
+    if(!fs2.length) return esc(t);
+    useRe = triBuildRe(fs2);
+    if(!useRe) return esc(t);
+  }
+  const parts = t.split(useRe);
+  if(parts.length < 2) return esc(t);
+  return parts.map((seg, i) => (i % 2) ? '<span class="' + cls + '">' + esc(seg) + '</span>' : esc(seg)).join('');
 }
 /* 把 原文 / 原译 / 修订 三份文本整理成逐句行模型（纯函数，便于测试） */
 function triBuild(){
@@ -1251,15 +1723,12 @@ function renderTriView(){
     box.innerHTML = '<div class="alert i">「原译」栏是空的：请把送校对的译文填进上方文本框（或从「文件」载入），再切回三栏对照。</div>';
     return;
   }
-  const found = new Array(M.edits.length).fill(false);
-  M.rows.forEach(r => {
-    M.edits.forEach((e, i) => {
-      if((e.to && r.neu.indexOf(e.to) >= 0) || (e.from && r.old.indexOf(e.from) >= 0)) found[i] = true;
-    });
-  });
-  const missing = M.edits.filter((e, i) => !found[i]);
   const toFrags = M.edits.map(e => e.to).filter(Boolean);
   const fromFrags = M.edits.map(e => e.from).filter(Boolean);
+  /* v4.35.0 性能：正则只在这里拼一次，下面循环全部复用；
+     命中片段收进 seen，最后据此判断哪些批注没在正文定位到。 */
+  const reAdd = triBuildRe(toFrags), reDel = triBuildRe(fromFrags);
+  const seen = new Set();
   const srcOn = !!((($('#src') || {}).value || '').trim());
   let changed = 0;
   // 按段分组：原文一格跨整段（grid-row:span N），原译/修订一格格逐句对齐，
@@ -1272,11 +1741,13 @@ function renderTriView(){
     let out = '<div class="tri-cell src' + (pi ? ' tri-p' : '') + '" style="grid-row:span ' + rows.length + '" data-para="' + (pi + 1) + '">' +
       '<span class="tri-num">¶' + (pi + 1) + '</span>' + srcHtml + '</div>';
     rows.forEach(r => {
-      const hasAdd = M.edits.some(e => e.to && r.neu.indexOf(e.to) >= 0);
-      const hasDel = M.edits.some(e => e.from && r.old.indexOf(e.from) >= 0);
+      const hasAdd = triHit(reAdd, r.neu);
+      const hasDel = triHit(reDel, r.old);
       if(hasAdd || hasDel) changed++;
-      const neuHtml = r.neu ? triMark(r.neu, toFrags, 'tri-add') : '<span class="tri-empty">—</span>';
-      const oldHtml = r.old ? triMark(r.old, fromFrags, 'tri-del') : '<span class="tri-empty">—</span>';
+      if(reAdd){ let m; reAdd.lastIndex = 0; while((m = reAdd.exec(r.neu))) seen.add(m[0]); }
+      if(reDel){ let m; reDel.lastIndex = 0; while((m = reDel.exec(r.old))) seen.add(m[0]); }
+      const neuHtml = r.neu ? triMark(r.neu, toFrags, 'tri-add', reAdd) : '<span class="tri-empty">—</span>';
+      const oldHtml = r.old ? triMark(r.old, fromFrags, 'tri-del', reDel) : '<span class="tri-empty">—</span>';
       out += '<div class="tri-row" data-para="' + r.para + '" data-row="' + r.k + '">' +
         '<div class="tri-cell old' + (r.k ? '' : ' tri-p') + '">' + oldHtml + '</div>' +
         '<div class="tri-cell neu' + (r.k ? '' : ' tri-p') + '">' + (hasAdd ? '<span class="tri-dot" title="本句有改动"></span>' : '') + neuHtml + '</div>' +
@@ -1284,6 +1755,7 @@ function renderTriView(){
     });
     return out;
   }).join('');
+  const missing = M.edits.filter(e => !((e.to && seen.has(e.to)) || (e.from && seen.has(e.from))));
   box.innerHTML =
     '<div class="tri-bar">' +
       '<span class="tri-note">' + M.nPara + ' 段 · ' + M.rows.length + ' 句 · 批注 ' + M.edits.length + ' 处' +
@@ -1311,6 +1783,83 @@ function renderTriView(){
   };
   $('#tri-back').onclick = () => setOutView('doc');
 }
+/* ═══════════ 三栏对照 · 翻译区直出（v4.35.0）═══════════
+   原先三栏只能在校对结果里看、得等跑完。现在译文框下加开关，翻译时就能并排看
+   原文｜译文，校对跑完自动带上修订列——同一套 triBuild，本地生成、不花 token。 */
+let TRI_INLINE_ON = false;
+let TRI_INLINE_TIMER = null;
+
+function triInlineHead(){
+  const srcOn = !!((($('#src') || {}).value || '').trim());
+  return '<div class="tri-head"><div>原文' + (srcOn ? '' : '（未填写）') + '</div><div>译文</div><div>修订' + (LAST_OUT ? '' : '（未校对）') + '</div></div>';
+}
+
+function renderTriInline(){
+  const box = $('#tri-inline');
+  if(!box) return;
+  if(!TRI_INLINE_ON){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  const srcVal = ((($('#src') || {}).value || '')).trim();
+  const dstVal = ((($('#dst') || {}).value || '')).trim();
+  if(!srcVal && !dstVal){
+    box.innerHTML = '<div class="alert i">把原文和译文贴进来，这里会实时三栏并排；校对跑完后自动补上「修订」列。</div>';
+    return;
+  }
+  const M = triBuild();
+  const hasRev = !!M.rp.length;
+  const MAXR = 300;
+  const total = M.rows.length;
+  const byPara = [];
+  M.rows.slice(0, MAXR).forEach(r => { (byPara[r.para - 1] = byPara[r.para - 1] || []).push(r); });
+  const toFrags = M.edits.map(e => e.to).filter(Boolean);
+  const fromFrags = M.edits.map(e => e.from).filter(Boolean);
+  const reAdd = triBuildRe(toFrags), reDel = triBuildRe(fromFrags);
+  const body = byPara.map((rows, pi) => {
+    if(!rows || !rows.length) return '';
+    const sp = (M.sp[pi] || '').trim();
+    const srcHtml = sp ? esc(sp) : '<span class="tri-empty">' + (srcVal ? '—' : '（未填写原文）') + '</span>';
+    let out = '<div class="tri-cell src' + (pi ? ' tri-p' : '') + '" style="grid-row:span ' + rows.length + '" data-para="' + (pi + 1) + '">' +
+      '<span class="tri-num">¶' + (pi + 1) + '</span>' + srcHtml + '</div>';
+    rows.forEach(r => {
+      const neuHtml = r.neu ? (hasRev ? triMark(r.neu, toFrags, 'tri-add', reAdd) : esc(r.neu)) : '<span class="tri-empty">—</span>';
+      const oldHtml = r.old ? triMark(r.old, fromFrags, 'tri-del', reDel) : '<span class="tri-empty">—</span>';
+      out += '<div class="tri-row" data-para="' + r.para + '" data-row="' + r.k + '">' +
+        '<div class="tri-cell old' + (r.k ? '' : ' tri-p') + '">' + oldHtml + '</div>' +
+        '<div class="tri-cell neu' + (r.k ? '' : ' tri-p') + '">' + neuHtml + '</div>' +
+        '</div>';
+    });
+    return out;
+  }).join('');
+  box.innerHTML =
+    '<div class="tri-bar">' +
+      '<span class="tri-note">' + M.nPara + ' 段 · ' + total + ' 句' +
+        (hasRev ? ' · 带修订列' : ' · 校对跑完自动补修订列') +
+        (total > MAXR ? ' · 只显示前 ' + MAXR + ' 句' : '') + ' · 本地生成，不花 token</span>' +
+      '<span style="flex:1"></span>' +
+      (hasRev ? '<button class="btn gray sm" id="tri-inline-copy">⧉ 复制三栏表格</button>' : '') +
+      '<button class="btn gray sm" id="tri-inline-close">收起</button>' +
+    '</div>' +
+    '<div class="tri-table">' + triInlineHead() + body + '</div>';
+  const cp = $('#tri-inline-copy'); if(cp) cp.onclick = triCopyTable;
+  const cl = $('#tri-inline-close'); if(cl) cl.onclick = () => triInlineToggle(false);
+}
+
+function triInlineToggle(on){
+  TRI_INLINE_ON = (typeof on === 'boolean') ? on : !TRI_INLINE_ON;
+  const btn = $('#btn-tri-inline');
+  if(btn){
+    btn.classList.toggle('vs-on', TRI_INLINE_ON);
+    btn.textContent = TRI_INLINE_ON ? '📊 收起三栏' : '📊 三栏对照';
+  }
+  renderTriInline();
+}
+
+function triInlineSchedule(){
+  if(!TRI_INLINE_ON) return;
+  clearTimeout(TRI_INLINE_TIMER);
+  TRI_INLINE_TIMER = setTimeout(renderTriInline, 300);
+}
+
 function setOutView(v){
   OUT_VIEW = (v === 'tri' && LAST_OUT) ? 'tri' : 'doc';
   const doc = $('#out'), tri = $('#out-tri');
@@ -1331,5 +1880,6 @@ function syncOutView(){
   if(seg) seg.style.display = LAST_OUT ? 'flex' : 'none';
   if(!LAST_OUT && OUT_VIEW === 'tri') OUT_VIEW = 'doc';
   setOutView(OUT_VIEW);
+  if(TRI_INLINE_ON) renderTriInline();
 }
 $$('#view-seg [data-view]').forEach(b => { b.onclick = () => setOutView(b.dataset.view); });

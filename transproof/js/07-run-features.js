@@ -39,6 +39,16 @@ function buildSystem(){
       L.push(TPL.termEmptyHeader);
       L.push(fill(TPL.termEmpty, V));
     }
+
+    // M4（T-012）：已批准专有译词同样注入，锁定一致 —— 走 approvedGloss() 唯一闸门（09-gloss.js 定义，本文件加载早于 09，需守卫）
+    const _ag = (typeof approvedGloss === 'function') ? approvedGloss() : (GLOSS.terms || []).filter(t => t && t.status === 'confirmed' && t.foreign && t.zh);
+    if(_ag.length){
+      L.push('');
+      L.push('【已批准专有译词 · 锁定一致】以下词条经审核「已批准」，全文必须严格照译、保持一致；未列入（待审核/已拒绝）的译法不强制。');
+      _ag.slice(0, 120).forEach(t => {
+        L.push('· ' + t.foreign + ' → ' + t.zh + (t.type ? '（' + t.type + '）' : ''));
+      });
+    }
   }
 
   if($('#c-ext').checked){ L.push(''); L.push(TPL.extHeader); L.push(fill(TPL.ext, V)); }
@@ -533,6 +543,20 @@ async function run(extOnly){
     const autoAudit = termAudit(extractProofText(text) || dst, $('#src').value);
     if(autoAudit.conflict.length || autoAudit.multi.length){
       toast('🩺 术语体检发现 ' + (autoAudit.conflict.length + autoAudit.multi.length) + ' 处不一致，点「术语体检」一键处理', 'w');
+    }
+    // 自动段落对齐体检（v4.31.0 · 本地零成本）：段数对不上多半是漏译/多译
+    if(typeof paraAudit === 'function'){
+      const autoPara = paraAudit($('#src').value, extractProofText(text) || dst);
+      if(autoPara.status !== 'equal' || autoPara.blanks.length){
+        toast('🧩 段落对齐：原文 ' + autoPara.srcN + ' 段 / 译文 ' + autoPara.dstN + ' 段' +
+          (autoPara.blanks.length ? '，含 ' + autoPara.blanks.length + ' 个空段' : '') + '，点「段落对齐」看位置', 'w');
+      }
+    }
+    if(typeof numAudit === 'function'){
+      const autoNum = numAudit($('#src').value, extractProofText(text) || dst);
+      if(autoNum.issueCount){
+        toast('🔢 数字体检：发现 ' + autoNum.issueCount + ' 处可疑（丢失/多出/百分号/漏否定），点「数字体检」看位置', 'w');
+      }
     }
     saveTask();
     if(typeof syncOutView === 'function') syncOutView(); // v4.30.0：亮出「📄 文档 / 📊 三栏对照」切换条

@@ -148,6 +148,13 @@ window.TransProof = {
 let G_SORT = { key:'', dir:1 };
 let G_SEL = new Set();
 
+/* M4（T-012 · v4.32.0）：术语权威分级唯一闸门 —— 只有「已批准（confirmed）」词条
+   才允许注入提示词；待审/已拒绝一律不进提示词。所有提示词注入点都必须走这里，
+   杜绝各处重复过滤、漏过滤（此前 02-prompts-reverse 提炼方针就漏了 status 过滤）。 */
+function approvedGloss(){
+  return GLOSS.terms.filter(t => t && t.status === 'confirmed' && t.foreign && t.zh);
+}
+
 function renderGloss(){
   renderGlossStats();
   renderCollections();
@@ -306,7 +313,12 @@ function renderGlossTable(){
       '<td>' + esc(t.type || '—') + '</td>' +
       '<td>' + (t.tags||[]).map(x => '<span class="g-tag">' + esc(x) + '</span>').join('') + '</td>' +
       '<td class="g-src" title="' + esc(srcNames) + '">' + esc(srcNames) + '</td>' +
-      '<td><span class="g-status ' + (t.status||'pending') + '">' + ({pending:'待审核',confirmed:'已确认',rejected:'已拒绝'}[t.status||'pending']) + '</span></td>' +
+      '<td><span class="g-status ' + (t.status||'pending') + '">' + (G_ST_LABEL[t.status||'pending']) + '</span>' +
+        '<div style="display:flex;gap:4px;margin-top:4px">' +
+          (t.status !== 'confirmed' ? '<button class="btn gray sm" data-approve title="批准此条，校对时锁定一致（M4）">✓ 批准</button>' : '') +
+          (t.status !== 'pending' ? '<button class="btn gray sm" data-topend title="打回待审核（改词/存疑都先回这里）">↺ 待审</button>' : '') +
+          (t.status !== 'rejected' ? '<button class="btn gray sm" data-toreject title="拒绝此条，不再注入提示词">✗ 拒绝</button>' : '') +
+        '</div></td>' +
       '<td class="g-rec">' + recLabel + '</td>' +
       '<td style="white-space:nowrap"><button class="btn gray sm" data-lookup title="联网查证通行译法">🔎</button> <button class="btn gray sm" data-verify title="AI 核查该条收录是否正确（v4.26.0）">🤖 核查</button> <button class="btn gray sm" data-edit>编辑</button> <button class="btn gray sm" data-merge1 title="把另一条合并进此条">⇄</button> <button class="btn gray sm" data-del title="删除此条">🗑</button></td>' +
       '</tr>';
@@ -322,17 +334,25 @@ function renderGlossTable(){
       renderGlossBatch();
     };
     tr.querySelector('[data-lookup]').onclick = () => glossLookup(id);
+    const bAp = tr.querySelector('[data-approve]'); if(bAp) bAp.onclick = () => glossSetStatus(id, 'confirmed');
+    const bPd = tr.querySelector('[data-topend]'); if(bPd) bPd.onclick = () => glossSetStatus(id, 'pending');
+    const bRj = tr.querySelector('[data-toreject]'); if(bRj) bRj.onclick = () => glossSetStatus(id, 'rejected');
     tr.querySelector('[data-verify]').onclick = async () => {
       const items = [{ src: t.foreign || '', dst: t.zh || '', extra: t.type || '' }];
       const vs = await verifyEntries(items, tr.querySelector('[data-verify]'));
       if(!vs) return;
-      showVerifyResults(items, vs, { onAdopt: (k, v) => {
-        if(!v.suggest) return false;
-        t.zh = v.suggest; t.status = 'pending';
-        saveGloss(); renderGlossTable();
-        toast('已改为建议译法，状态回到「待审核」');
-        return true;
-      }});
+      showVerifyResults(items, vs, {
+        // M4：ok → 一键批准为「已批准」；bad/采纳建议 → 打回待审核
+        onApprove: () => { glossSetStatus(t.id, 'confirmed'); },
+        onAdopt: (k, v) => {
+          if(!v.suggest) return false;
+          t.zh = v.suggest; t.status = 'pending';
+          saveGloss(); glossLog('status', 'term:'+t.id, 'adopt', 'pending');
+          renderGlossTable();
+          toast('已改为建议译法，状态回到「待审核」');
+          return true;
+        }
+      });
     };
     tr.querySelector('[data-edit]').onclick = () => glossEdit(id);
     tr.querySelector('[data-merge1]').onclick = () => glossMergeInto(id);
@@ -357,6 +377,23 @@ function glossDelete(id){
   GLOSS.terms = GLOSS.terms.filter(x => String(x.id) !== String(id));
   G_SEL.delete(id);
   saveGloss(); renderGloss(); toast('已删除「' + label + '」');
+}
+
+// ── M4（T-012）单条状态迁移：待审 ⇄ 已批准 ⇄ 已拒绝，toast + 持久化 + 变更日志 ──
+const G_ST_LABEL = { pending:'待审核', confirmed:'已批准', rejected:'已拒绝' };
+function glossSetStatus(id, status){
+  const t = GLOSS.terms.find(x => String(x.id) === String(id));
+  if(!t) return false;
+  const label = t.zh || t.foreign || ('#' + id);
+  if(t.status === status){ toast('「' + label + '」已是「' + G_ST_LABEL[status] + '」'); return false; }
+  const before = t.status || 'pending';
+  t.status = status;
+  t.updated = Date.now();
+  saveGloss();
+  glossLog('status', 'term:' + t.id, before, status);
+  renderGlossTable();
+  toast('「' + label + '」→ ' + G_ST_LABEL[status] + (status === 'confirmed' ? '（校对时会被锁定一致）' : '（不再注入提示词）'));
+  return true;
 }
 
 // ── 争议术语联网查证（P2 #8）──

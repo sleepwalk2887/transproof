@@ -111,7 +111,9 @@ function buildTransSystem(){
     L.push('');
   }
   if(GLOSS.terms.length && termMode !== 'off'){
-    const sample = GLOSS.terms.filter(t => t.status === 'confirmed' && t.foreign && t.zh && termActive(t)).slice(0, 60)
+    // M4（T-012）：走 approvedGloss() 唯一闸门（只认已批准词条）
+    const _ag = (typeof approvedGloss === 'function') ? approvedGloss() : GLOSS.terms.filter(t => t.status === 'confirmed' && t.foreign && t.zh);
+    const sample = _ag.filter(t => termActive(t)).slice(0, 60)
       .map(t => t.foreign + ' → ' + t.zh + (t.tags && t.tags.length ? ' [' + t.tags.join(',') + ']' : '')).join('\n');
     if(sample){
       L.push('【专有译词库 — confirmed 状态】');

@@ -360,10 +360,12 @@ async function reverseFromPostscript(text){
 async function reverseFromTerms(){
   // 不调模型，本地分析即可，避免无谓花费
   const sample = TERMS.slice(0, 60).map(t => t.src + ' → ' + t.dst + (t.cat ? ' [' + t.cat + ']' : '') + (t.note ? ' ' + t.note : '')).join('\n');
-  const glossSample = GLOSS.terms.slice(0, 60).filter(t => t.foreign && t.zh).map(t => t.foreign + ' → ' + t.zh + (t.type ? ' [' + t.type + ']' : '') + ((t.tags||[]).length ? ' ' + t.tags.join('、') : '')).join('\n');
+  // M4（T-012）：只注入已批准词条 —— 走 approvedGloss() 唯一闸门（09-gloss.js 定义），本文件加载早于 09，需守卫
+  const gApproved = (typeof approvedGloss === 'function') ? approvedGloss() : GLOSS.terms.filter(t => t && t.status === 'confirmed' && t.foreign && t.zh);
+  const glossSample = gApproved.slice(0, 60).map(t => t.foreign + ' → ' + t.zh + (t.type ? ' [' + t.type + ']' : '') + ((t.tags||[]).length ? ' ' + t.tags.join('、') : '')).join('\n');
   const cats = {}; TERMS.forEach(t => { if(t.cat) cats[t.cat] = (cats[t.cat]||0) + 1; });
   const catList = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v]) => k + ':' + v).join('、');
-  const core = '严格按已固化术语库（' + TERMS.length + ' 条）与专有译词库（' + GLOSS.terms.length + ' 条）译名输出，类别偏好：' + (catList || '无') + '。同一外文术语全书保持一致译法，类别敏感词不得擅自调整。';
+  const core = '严格按已固化术语库（' + TERMS.length + ' 条）与专有译词库（' + gApproved.length + ' 条 · 仅已批准）译名输出，类别偏好：' + (catList || '无') + '。同一外文术语全书保持一致译法，类别敏感词不得擅自调整。';
   const full = '你是一位严格遵循既定术语表的翻译家。\n\n【翻译准则】\n1. 凡是术语库中已收录的词条，必须严格采用库中的译法，不得使用任何变体。\n2. 凡是专有译词库中已确认（confirmed）的词条，同样严格执行。\n3. 首次出现的专名建议按库中已有同类型条目（如 ' + (catList || '其他') + '）的命名习惯。\n4. 不擅自增删译注。\n\n【本次翻译的参考术语（节选）】\n' + (sample || '（术语库为空）') + '\n\n【本次翻译的专有译词（节选）】\n' + (glossSample || '（词库为空）');
   return {
     name: '从术语库自动提炼（' + (catList || '多领域') + '）',
@@ -421,9 +423,11 @@ function renderReverseResult(p, srcLabel, dstLabel, source, sourceFile){
 }
 
 /* ── 简单非流式模型调用（用于反推，避免中间态闪烁） ── */
-async function callModelSimple(sys, user, maxTok){
+async function callModelSimple(sys, user, maxTok, extSignal){
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), (CFG.timeout || 180) * 1000);
+  /* v4.34.0：支持外部中断信号——三段流水线「中断/关闭」立即掐断，不再干等超时 */
+  if(extSignal){ if(extSignal.aborted) ctrl.abort(); else extSignal.addEventListener('abort', () => ctrl.abort(), { once:true }); }
   try{
     const r = await fetch(CFG.baseUrl.replace(/\/+$/,'') + '/chat/completions', {
       method:'POST', signal: ctrl.signal,

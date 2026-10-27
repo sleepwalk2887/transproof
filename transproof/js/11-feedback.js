@@ -5,11 +5,48 @@
    本地：提交先落 tp.fb.log（仅存未发出的，网络不通也不丢，可在任务页重发） */
 const FB_ERRS = [];
 window.addEventListener('error', function(e){
+  const msg = String(e.message || e.type || '');
   try{
-    FB_ERRS.push((new Date()).toTimeString().slice(0,8) + ' ' + String(e.message || e.type || ''));
+    FB_ERRS.push((new Date()).toTimeString().slice(0,8) + ' ' + msg);
     if(FB_ERRS.length > 20) FB_ERRS.shift();
   }catch(_){}
+  fbAutoReport('JS 报错', msg + (e.filename ? ' @' + String(e.filename).split('/').pop() + ':' + (e.lineno||0) : ''));
 });
+window.addEventListener('unhandledrejection', function(e){   /* v4.34.0：Promise 挂了也要记+报 */
+  const r = e && e.reason;
+  const msg = (r && (r.message || r)) || 'Promise rejected';
+  try{
+    FB_ERRS.push((new Date()).toTimeString().slice(0,8) + ' Promise: ' + msg);
+    if(FB_ERRS.length > 20) FB_ERRS.shift();
+  }catch(_){}
+  fbAutoReport('Promise 挂了', msg);
+});
+
+/* ── v4.34.0 线上报错自动上报：有报错 → 立刻进反馈通道（线上 https 才发；本地无接口静默）→
+   开发端看门狗每分钟巡检 /api/feedback/list，发现新条目就在 DSH 聊天框提醒 ── */
+let FB_AUTO_T = 0, FB_AUTO_SIG = '';
+function fbAutoReport(kind, msg){
+  try{
+    if(location.protocol !== 'https:') return;   /* 本地没有 /api 通道，不发 */
+    const text = String(msg || '').trim();
+    if(!text) return;
+    const sig = kind + '|' + text.slice(0, 120);
+    if(sig === FB_AUTO_SIG) return;              /* 同一条报错不重复发 */
+    const now = Date.now();
+    if(now - FB_AUTO_T < 30000) return;          /* 30 秒节流，防刷屏 */
+    FB_AUTO_T = now; FB_AUTO_SIG = sig;
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const localTime = d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+    fbPost({
+      desc: '🤖 自动报错（' + kind + '）：' + text.slice(0, 400),
+      time: localTime, func: '其他',
+      where: '自动捕获 · ' + location.pathname + ' · ' + fbPageName(),
+      contact: '', ver: APP_VERSION, page: fbPageName(), path: location.pathname,
+      ua: navigator.userAgent.slice(0, 200),
+      lastErr: FB_ERRS.join(' | ').slice(0, 300)
+    }).catch(function(){ /* 发不出去就留在 FB_ERRS，手动反馈仍会带上 */ });
+  }catch(_){}
+}
 
 const FB_KEY = 'tp.fb.log';
 const FB_FUNCS = ['运行与校对','导入与解析（PDF/Word/扫描OCR）','术语库','译词库','批量与智能扫描','导出与修订（Word）','设置与模型','开屏与界面','项目看板','其他'];
