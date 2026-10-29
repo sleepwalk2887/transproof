@@ -528,6 +528,7 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
 .g-collections-head::before{content:"";display:inline-block;width:6px;height:14px;flex:0 0 auto;background:repeating-linear-gradient(45deg,var(--tx) 0 4px,transparent 4px 8px)}
 /* ── 反馈（v4.26.0） ── */
 .fb-fab{position:fixed;right:20px;bottom:24px;z-index:900}
+.ver-tag{position:fixed;left:12px;bottom:8px;z-index:800;font-size:11px;line-height:1;color:#8a8a8a;background:rgba(255,255,255,.72);border:1px solid #e2e2e2;border-radius:10px;padding:3px 9px;pointer-events:none;user-select:none;font-family:monospace}
 .fb-list{display:flex;flex-direction:column;gap:8px}
 .fb-item{background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r);padding:12px 16px;display:flex;flex-direction:column;gap:4px}
 .fb-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:var(--f-mono);font-size:12px;color:var(--tx3)}
@@ -1648,6 +1649,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
            <tr><td><b>🔣 标点·书名号对账（v4.37 新）</b></td><td>一键本地体检（不花 token）：把原文和译文的书名号《》、括号、引号、问号、叹号、破折号、省略号逐个对账——漏标、多标、括号没闭合的硬伤全部标出。标点这种纯机械的错，AI 根本看不见、但编辑一眼就挑出来；本地数个数就能查，不花 token。只报可疑、以人工复核为准</td></tr>
            <tr><td><b>📝 翻译腔体检（v4.38 新）</b></td><td>一键本地体检（不花 token）：查句末落「的」、「的」字堆叠、「作为…的东西」「被…所」这类日式/欧化翻译腔和套话直译——AI 改完还留的那股"翻译味儿"，本地正则就能揪出来。只报可疑、以人工复核为准</td></tr>
            <tr><td><b>🔎 专名核验 + 术语表回填（v4.39 新）</b></td><td>翻译页勾「翻译后抽专名」，译完自动把专名和建议译名收进专有译词库（待审核）；译词库新面板「🔎 专名核验」里 AI 批量核验、人工回填真 URL 依据、一键批准，再「🔗 一键统一全文」把括号绑定的别名写法统一成批准译法。核验要调 AI（花 token），统一在你电脑本地完成</td></tr>
+          <tr><td><b>🏷 左下角版本显示（v4.39.1 新）</b></td><td>页面最底端左下角常驻显示当前版本号，网页端和插件端同款，报错/核对时一眼就能看到自己用的是哪一版</td></tr>
         </tbody>
       </table>
       <div class="alert i" style="margin-top:12px">
@@ -1785,6 +1787,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
            <tr><td><b>近期</b></td><td><b>标点·书名号 1:1 机械对账</b>：书名号《》/括号/引号/问号/叹号/破折号/省略号，原文 vs 译文逐个对账，悬空括号与漏标多标直接标出（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.37.0，工具组「🔣 标点对账」）</td></tr>
            <tr><td><b>近期</b></td><td><b>翻译腔体检</b>：句末落「的」、「的」密度、「作为…的东西/被…所」黑名单套话——揪出 AI 改完还留的翻译味儿（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.38.0，体检中心「📝 翻译腔体检」）</td></tr>
            <tr><td><b>近期</b></td><td><b>专名核验 + 术语表回填</b>：翻译后自动抽专名入词库 → 面板里 AI 核验 + 真 URL 回填 + 批准 → 一键统一全文译法</td><td>✅ 已上线（v4.39.0，专有译词库「🔎 专名核验」）</td></tr>
+          <tr><td><b>近期</b></td><td><b>左下角版本显示</b>：页面最底端左下角常驻显示当前版本号，网页端 / 插件端同款</td><td>✅ 已上线（v4.39.1）</td></tr>
           <tr><td><b>云端版</b></td><td><b>改动留痕、可回溯</b>：每次重要校对留下不可篡改的备份点，谁改了什么、当时发生了什么都能查，不再靠猜</td><td>规划中</td></tr>
         </tbody>
       </table>

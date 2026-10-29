@@ -1,5 +1,17 @@
 /* ═══════════ 配置与状态 ═══════════ */
-const APP_VERSION = '4.39.0'; // 全局版本号：TransProof.version 与 #g-version 标签共用
+const APP_VERSION = '4.39.1'; // 全局版本号：TransProof.version 与 #g-version 标签共用
+/* 左下角版本显示（v4.39.1） */
+(function(){
+  function addVerTag(){
+    if(typeof document === 'undefined' || document.getElementById('ver-tag')) return;
+    var d = document.createElement('div');
+    d.id = 'ver-tag';
+    d.className = 'ver-tag';
+    d.textContent = 'v' + APP_VERSION;
+    (document.body || document.documentElement).appendChild(d);
+  }
+  if(document.body){ addVerTag(); } else { document.addEventListener('DOMContentLoaded', addVerTag); }
+})();
 const LS = {
   cfg:'tp.cfg', terms:'tp.terms', prefs:'tp.prefs', history:'tp.history', memory:'tp.memory'
 };

@@ -151,6 +151,7 @@
 > **🆕 2026-10-28 进展 · T-030 DSH 插件薄壳**：原型已搭好（transproof-plugin/：package.json + client.js + host/index.js + cordis.patch.yml + locale/icon）。**结论：DSH 页面入口是 React 组件**（window.__ModuleLoader__.load + require('react') + ctx.slots.inject('main')），纯 HTML/JS 不能「裸」进，但套一层 iframe 薄壳就能承载现有 TransProof、核心 js 不改。Agent 工具「跑本地体检」（纯本地不联网）已注册。详见本轮报告。
 
 > **🆕 2026-10-30 进展 · T-022 专名核验 + 术语表回填**：已上线 v4.39.0。翻译页勾「翻译后抽专名」译完自动抽专名入词库（待审）；译词库新面板「🔎 专名核验」AI 批量核验、人工回填真 URL、批准、一键统一全文。新文件 `js/14-noun-verify.js`；测试 46 全绿。
+> **🆕 2026-10-30 进展 · 左下角版本显示**：已上线 v4.39.1。页面最底端左下角常驻显示当前版本号（网页端/插件端同款），不打扰操作；测试 47 全绿。
 
 | 做序 | 优先级 | 卡片 | 状态 | 解决什么（白话） | 衔接现有功能 | 成本 / 可行度 |
 |---|---|---|---|---|---|---|
