@@ -4,8 +4,8 @@
 > 人类接手请读 `HANDOFF.md`。本文件是全包唯一入口，链式引用，不重复内容。
 
 ## 项目一句话
-TransProof（译校助手）：纯前端单文件 AI 翻译校对工具（`transproof/index.html` 内联全部 HTML/CSS/JS + `config.js` 出厂模板），外接大模型 API 干活，数据存浏览器 localStorage，零后端零构建。
-线上：https://transproof.pages.dev （Cloudflare Pages）· 当前 **v4.25.0** · 测试 **29/29 全绿**（2026-10-14）
+TransProof（译校助手）：纯前端 AI 翻译校对工具，零后端零构建。`transproof/index.html` + `js/` 下 13 个 classic script（按序加载，`01-core` 第 2 行定义 `APP_VERSION`），外接大模型 API 干活，数据存浏览器 localStorage。
+线上：https://transproof.pages.dev （Cloudflare Pages）· 当前 **v4.38.1**（2026-10-30）· 测试 `node run-all.js` 共 45 个用例
 
 ## 会话启动流程（每次新会话照做）
 1. 读 `HANDOFF.md` —— 架构、关键约定（**第八节是铁律**）、版本史、发版流程
@@ -26,8 +26,22 @@ node run-all.js      # 全量 Playwright 测试（期望 PASS=29 FAIL=0）
 1. **测试锚点**：不改按钮 id、八个标签页结构、测试断言依赖的文案
 2. **发版铁律**（用户规定）：功能更新 + 版本 bump 后必须 ①自检（`_check.js` + 全量 + bump 后复跑）②更新 `transproof/index.html` 的 `#p-help` 使用指南 ③更新 `乱风企划tips.md`（已上线表加行+计数）→ 然后才同步副本、发布
 3. **密钥不入库**：Cloudflare/API 凭证在 `~/.transproof-deploy/env`（本包不含），任何文件不得写入密钥
-4. **版本号**：`index.html` 的 `APP_VERSION`，bump 后必须复跑全量
+4. **版本号**：`js/01-core.js` 第 2 行的 `APP_VERSION`（**不在 index.html**），bump 后必须复跑全量
 5. 用户是文科生，一切说明要「零基础能懂、白话、表格化」
+
+## 回复规范（每次回复都照做，硬性）
+
+| # | 规矩 | 说明 |
+|---|---|---|
+| 1 | **白话 + 表格** | 结论先行，能上表就不写大段，不堆术语（用户是文科生） |
+| 2 | **每完成一件事就汇报** | 用人话说清「现状 + 原因」，别只丢一句「做完了」 |
+| 3 | **每轮报进度** | 用户原话「每次完成之后应当向我汇报进度」 |
+| 4 | **改完当场核对再报完成** | `grep` 或读回比对，绝不假报（出过 2 次假报「已写进 tips」） |
+| 5 | **复读机就停** | 出现「同字无限重复 / 工具调用死循环」→ 立即停手汇报，别闷头改（出过 4 次） |
+| 6 | **答复末尾带两句** | 「看 tips」+「革命尚未成功，同志仍需努力」 |
+| 7 | **不许猜** | 查不到的事写「查不到 / 待确认」，禁止用推测填形状 |
+
+> 完整版见 `交接本.md` 第 1 节。
 
 ## 任务板
 见 `TASKS.md`（结构化字段：id / priority / status / acceptance）。
