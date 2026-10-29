@@ -840,6 +840,164 @@ function showNumAudit(){
   $('#num-close').onclick = closeModal;
 }
 
+/* ═══════════ 标点·书名号 1:1 机械对账（T-023 · v4.37.0 · 本地零 token）═══════════
+   借鉴 audit_parity 思路：标点这类纯机械、零判断的硬伤，不该花 token 让 AI 查——
+   本地数个数就能对账。只报可疑，以人工复核为准。 */
+
+function punctAudit(srcText, dstText){
+  srcText = String(srcText || ''); dstText = String(dstText || '');
+  const cntCh = (t, ch) => { let n = 0; for(let i = 0; i < t.length; i++){ if(t[i] === ch) n++; } return n; };
+  const cnt = (t, re) => (t.match(re) || []).length;
+  const PAIRS = [
+    { name: '书名号《 》', open: '《', close: '》' },
+    { name: '单书名号〈 〉', open: '〈', close: '〉' },
+    { name: '引号「 」', open: '「', close: '」' },
+    { name: '括号（ ）', open: '（', close: '）' },
+    { name: '双引号“ ”', open: '“', close: '”' },
+    { name: '单引号‘ ’', open: '‘', close: '’' }
+  ];
+  const unpaired = [];
+  [['原文', srcText], ['译文', dstText]].forEach(function(row){
+    const side = row[0], t = row[1];
+    PAIRS.forEach(function(p){
+      const o = cntCh(t, p.open);
+      const c = cntCh(t, p.close);
+      if(o !== c) unpaired.push({ side: side, name: p.name, open: p.open, close: p.close, oc: o, cc: c });
+    });
+  });
+  const MARKS = [
+    { name: '书名号《', re: /《/g },
+    { name: '单书名号〈', re: /〈/g },
+    { name: '括号（', re: /（/g },
+    { name: '问号 ？', re: /[？?]/g },
+    { name: '叹号 ！', re: /[！!]/g },
+    { name: '破折号 ——', re: /—+/g },
+    { name: '省略号 ……', re: /…+/g }
+  ];
+  const mismatch = [];
+  MARKS.forEach(function(m){
+    const sc = cnt(srcText, m.re), dc = cnt(dstText, m.re);
+    if(sc !== dc) mismatch.push({ name: m.name, sc: sc, dc: dc });
+  });
+  const srcTotal = MARKS.reduce((a, m) => a + cnt(srcText, m.re), 0);
+  const dstTotal = MARKS.reduce((a, m) => a + cnt(dstText, m.re), 0);
+  const issueCount = unpaired.length + mismatch.length;
+  return { srcTotal: srcTotal, dstTotal: dstTotal, unpaired: unpaired, mismatch: mismatch, issueCount: issueCount, clean: issueCount === 0 };
+}
+
+function showPunctAudit(){
+  const srcText = $('#src').value.trim();
+  const dstText = extractProofText(LAST_OUT) || $('#dst').value.trim();
+  if(!srcText){ toast('请先粘贴原文，再做标点对账', 'e'); return; }
+  if(!dstText){ toast('请先校对，或粘贴待核对的译文，再做标点对账', 'e'); return; }
+  const r = punctAudit(srcText, dstText);
+  const parts = [];
+  parts.push('<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--tx2);margin-bottom:14px">' +
+    '<span>原文标点 <b>' + r.srcTotal + '</b> 处</span>' +
+    '<span>译文标点 <b>' + r.dstTotal + '</b> 处</span>' +
+    '<span>可疑 <b style="color:' + (r.issueCount ? 'var(--err)' : 'var(--tx2)') + '">' + r.issueCount + '</b> 处</span>' +
+    '<span>判定 <b style="color:' + (r.clean ? 'var(--tx2)' : 'var(--err)') + '">' + (r.clean ? '✓ 未见异常' : '⚠ 需人工复核') + '</b></span></div>');
+  if(r.clean){
+    parts.push('<div class="alert ok">✓ 标点对账：书名号、括号、引号、问号、叹号、破折号、省略号在原文与译文里数量都对得上，也没有悬空的括号。</div>');
+  }
+  if(r.unpaired.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 悬空的配对符号 ' + r.unpaired.length + ' 处（开/合数量不等）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">比如有 3 个「《」却只有 2 个「》」——括号没闭合是硬伤。</div>');
+    parts.push(r.unpaired.map(function(x){
+      return '<div class="seg" style="font-size:13px"><div style="color:var(--err);margin-bottom:4px">' +
+        esc(x.side) + '：' + esc(x.name) + ' 开 <b>' + x.oc + '</b> 个 / 合 <b>' + x.cc + '</b> 个</div></div>';
+    }).join(''));
+  }
+  if(r.mismatch.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 数量对不上的标点 ' + r.mismatch.length + ' 种（原文 vs 译文）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">这类标点一般该一一对应；数量不一样，多半是漏标、多标或换成了别的写法，请逐个核对。</div>');
+    parts.push(r.mismatch.map(function(x){
+      return '<div class="seg" style="font-size:13px"><div style="color:var(--err);margin-bottom:4px">' +
+        esc(x.name) + '：原文 <b>' + x.sc + '</b> 个，译文 <b>' + x.dc + '</b> 个</div></div>';
+    }).join(''));
+  }
+  parts.push('<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">' +
+    '<button class="btn gray sm" id="punct-close">关闭</button>' +
+    '<span style="font-size:12px;color:var(--tx3)">本地机械比对 · 不调 AI · 不花 token · 只报可疑，以人工复核为准</span></div>');
+  modal('🔣 标点·书名号对账', parts.join(''));
+  $('#punct-close').onclick = closeModal;
+}
+
+/* ═══════════ 翻译腔体检（T-025 · 本地零 token）═══════════
+   专抓「一看就是外文翻过来的」别扭句：句末落「的」、「的」字堆叠、套话/直译黑名单。
+   纯本地机械比对，不调 AI、不花 token，只报可疑、以人工复核为准。 */
+function styleAudit(text){
+  text = String(text || '');
+  const sents = text.split(/[。！？；…]+/).map(s => s.trim()).filter(Boolean);
+  const deFinal = [];
+  const deDense = [];
+  const black = [];
+  sents.forEach(function(s, i){
+    const no = i + 1;
+    if(s.length >= 6 && /的$/.test(s)) deFinal.push({ no: no, s: s });
+    const dn = (s.match(/的/g) || []).length;
+    if(dn >= 4) deDense.push({ no: no, n: dn, s: s });
+  });
+  const BLACK = [
+    { name: '「作为…的东西」式直译', re: /作为[^。；！？]{0,24}的东西/g },
+    { name: '「被…所…」被动腔', re: /被[^。；！？，]{0,16}所/g },
+    { name: '「在…的情况下」欧化', re: /在[^。；！？，]{0,20}的情况下/g },
+    { name: '「对于…来说」欧化', re: /对于[^。；！？，]{0,20}来说/g },
+    { name: '「关于…方面」套话', re: /关于[^。；！？，]{0,16}方面/g },
+    { name: '「之所以…是因为」欧化', re: /之所以[^。；！？，]{0,20}是因为/g },
+    { name: '「进行…」空洞动词', re: /进行(?:分析|研究|讨论|检查|处理|调查|了解|考虑|比较)/g }
+  ];
+  BLACK.forEach(function(b){
+    const m = text.match(b.re) || [];
+    if(m.length) black.push({ name: b.name, count: m.length, samples: m.slice(0, 3) });
+  });
+  const deCount = (text.match(/的/g) || []).length;
+  const issueCount = deFinal.length + deDense.length + black.reduce((a, b) => a + b.count, 0);
+  return { sentCount: sents.length, deFinal: deFinal, deDense: deDense, black: black, deCount: deCount, issueCount: issueCount, clean: issueCount === 0 };
+}
+
+function showStyleAudit(){
+  const cl = function(s, n){ s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+  const dstText = extractProofText(LAST_OUT) || $('#dst').value.trim();
+  if(!dstText){ toast('请先校对，或粘贴待检查的译文，再做翻译腔体检', 'e'); return; }
+  const r = styleAudit(dstText);
+  const parts = [];
+  parts.push('<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--tx2);margin-bottom:14px">' +
+    '<span>句子 <b>' + r.sentCount + '</b> 句</span>' +
+    '<span>「的」字 <b>' + r.deCount + '</b> 个</span>' +
+    '<span>可疑 <b style="color:' + (r.issueCount ? 'var(--err)' : 'var(--tx2)') + '">' + r.issueCount + '</b> 处</span>' +
+    '<span>判定 <b style="color:' + (r.clean ? 'var(--tx2)' : 'var(--err)') + '">' + (r.clean ? '✓ 未见翻译腔' : '⚠ 需人工复核') + '</b></span></div>');
+  if(r.clean){
+    parts.push('<div class="alert ok">✓ 翻译腔体检：没发现句末落「的」、「的」字堆叠或套话直译，读起来比较顺。</div>');
+  }
+  if(r.deFinal.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 句末落「的」 ' + r.deFinal.length + ' 句</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">中文句子一般不以「的」收尾，读着别扭，请顺一下。</div>');
+    parts.push(r.deFinal.map(function(x){
+      return '<div class="seg" style="font-size:13px"><div style="color:var(--err);margin-bottom:4px">第 ' + x.no + ' 句</div>' + esc(cl(x.s, 90)) + '</div>';
+    }).join(''));
+  }
+  if(r.deDense.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 「的」字堆叠 ' + r.deDense.length + ' 句（一句 4 个以上）</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">一句话塞太多「的」，读着累，试着拆短或换个说法。</div>');
+    parts.push(r.deDense.map(function(x){
+      return '<div class="seg" style="font-size:13px"><div style="color:var(--err);margin-bottom:4px">第 ' + x.no + ' 句 · 「的」× ' + x.n + '</div>' + esc(cl(x.s, 90)) + '</div>';
+    }).join(''));
+  }
+  if(r.black.length){
+    parts.push('<h4 style="margin:12px 0 6px;color:var(--err)">⚠ 套话 / 直译 ' + r.black.reduce((a, b) => a + b.count, 0) + ' 处</h4>');
+    parts.push('<div style="font-size:12px;color:var(--tx3);margin-bottom:6px">这些是典型的「翻译腔」说法，能换掉就换掉。</div>');
+    parts.push(r.black.map(function(x){
+      return '<div class="seg" style="font-size:13px"><div style="color:var(--err);margin-bottom:4px">' + esc(x.name) + ' × ' + x.count + '</div>' + x.samples.map(function(s){ return esc(cl(s, 60)); }).join(' / ') + '</div>';
+    }).join(''));
+  }
+  parts.push('<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">' +
+    '<button class="btn gray sm" id="style-close">关闭</button>' +
+    '<span style="font-size:12px;color:var(--tx3)">本地机械比对 · 不调 AI · 不花 token · 只报可疑，以人工复核为准</span></div>');
+  modal('📝 翻译腔体检', parts.join(''));
+  $('#style-close').onclick = closeModal;
+}
+
 /* ═══════════ 体检中心 + 译文总评分 + 风格简报（v4.36.0 · 本地零 token）═══════════
    总分框架借鉴 dsh-plugin-translation（MIT）的 quality：它给译文打 0–100 分，
    我们这里把已有的各项体检汇成同一个总分，刻度与「质量预估」一致（0–100 + S/A/B/C/D）。 */
@@ -998,7 +1156,7 @@ function showToneBrief(){
 /* ── 体检中心：开关 + 一键全检 ── */
 const AO_KEY = 'tp.auditOpts';
 function auditOptsGet(){
-  const d = { term:true, pnoun:true, para:true, num:true, quality:true, tone:false };
+  const d = { term:true, pnoun:true, para:true, num:true, quality:true, tone:false, style:true };
   const s = load(AO_KEY, null);
   return (s && typeof s === 'object') ? Object.assign(d, s) : d;
 }
@@ -1043,6 +1201,10 @@ function auditAll(){
   if(o.num && typeof numAudit === 'function'){
     const r = numAudit(src, target);
     add('数字与格式', r.issueCount || 0, r.clean ? '干净' : '数字 / 百分号 / 否定词有可疑处', 'showNumAudit');
+  }
+  if(o.style && typeof styleAudit === 'function'){
+    const r = styleAudit(target);
+    add('翻译腔', r.issueCount || 0, r.clean ? '干净' : '句末落「的」/「的」堆叠/套话直译', 'showStyleAudit');
   }
   if(o.quality && typeof qualityScore === 'function'){
     const q = qualityScore(src, target);
@@ -1166,6 +1328,9 @@ $('#btn-audit').onclick = () => showTermAudit();
 $('#btn-para-audit') && ($('#btn-para-audit').onclick = () => showParaAudit());
 // 数字与格式体检入口（T-015 · v4.33.0 · 本地零成本）
 $('#btn-num-audit') && ($('#btn-num-audit').onclick = () => showNumAudit());
+// 标点·书名号对账入口（T-023 · v4.37.0 · 本地零成本）
+$('#btn-punct-audit') && ($('#btn-punct-audit').onclick = () => showPunctAudit());
+$('#btn-style-audit') && ($('#btn-style-audit').onclick = () => showStyleAudit());
 /* 体检中心 + 总评分 + 风格简报（v4.36.0） */
 $('#btn-audit-center') && ($('#btn-audit-center').onclick = () => auditCenterToggle());
 $('#btn-audit-center-close') && ($('#btn-audit-center-close').onclick = () => auditCenterToggle(false));

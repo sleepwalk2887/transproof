@@ -764,12 +764,15 @@ header::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;z-in
       <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ao-num" checked style="width:auto"> 数字与格式</label>
       <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ao-quality" checked style="width:auto"> 译文总评分（含漏译残留 / 占位符保护）</label>
       <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ao-tone" style="width:auto"> 风格简报</label>
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="ao-style" checked style="width:auto"> 翻译腔</label>
     </div>
     <div class="tb-g">
       <button class="btn gray sm" id="btn-audit" title="本地扫描：检查术语是否前后统一、术语库译法是否被遵守（不调 AI、不花 token）">🩺 术语体检</button>
       <button class="btn gray sm" id="btn-pnoun" title="本地零流量核对专名一致性：同名异译/疑似未译/数字丢失，可一键统一（v4.28.0）">🔎 专名体检</button>
       <button class="btn gray sm" id="btn-para-audit" title="本地核对：原文与译文的段落数量是否对得上，缺段/多段/空段直接标出位置（不调 AI、不花 token）">🧩 段落对齐</button>
       <button class="btn gray sm" id="btn-num-audit" title="本地核对：数字有没有丢/被改/凭空多出、百分号丢没丢、否定词（not、不、无）漏没漏——AI 最抓不住的安静硬伤（不调 AI、不花 token）">🔢 数字体检</button>
+      <button class="btn gray sm" id="btn-punct-audit" title="本地核对：书名号《》、括号、引号、问号、叹号、破折号、省略号有没有漏标/多标、括号是否闭合——纯机械 1:1 对账（不调 AI、不花 token）">🔣 标点对账</button>
+      <button class="btn gray sm" id="btn-style-audit" title="本地核对：译文里有没有「翻译腔」——句末落「的」、「的」字堆叠、套话直译，读着别扭的地方（不调 AI、不花 token）">📝 翻译腔体检</button>
       <button class="btn gray sm" id="btn-quality" title="本地算出 0–100 总分 + S/A/B/C/D，拆成忠实度 / 流畅度，逐条列出扣分项（v4.36.0，不花 token）">📊 总评分</button>
       <button class="btn gray sm" id="btn-tone" title="按上方选的「体裁调性」给一份具体检查清单，翻译校对时照着走（v4.36.0，本地零流量）">🎛 风格简报</button>
     </div>
@@ -1631,6 +1634,8 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>✅ 术语已批准（v4.32 新）</b></td><td>专有译词库的词条分「待审 / 已批准 / 已拒绝」三态：校对只锁定「已批准」的译法，待审和已拒绝的不强制；每行一键「批准 / 待审 / 拒绝」，也可让 AI 核查后直接一键批准。改了已批准的译法会自动打回待审，避免悄悄改动权威译名</td></tr>
           <tr><td><b>🔢 数字体检（v4.33 新）</b></td><td>一键本地体检（不花 token）：把原文和译文的数字逐个对账——丢了的、凭空多出来的、百分号弄丢的，还有整段漏掉否定词（not / 不 / 无）的，全部标出是第几处并贴出上下文；「1,500 → 1.5万」这类换算不会误报。校对跑完也会自动提醒一次</td></tr>
            <tr><td><b>🩺 体检中心 + 📊 译文总评分（v4.36 新）</b></td><td>工具组的「🩺 体检中心」把术语、专名、段落、数字这四项体检收在一起，每一项都能自己勾要不要做，点「▶ 一键体检」就出一张结果表，哪项有问题一眼看到，还能点「看细节」跳回原来那项。里面还有两个新东西：<b>📊 译文总评分</b>——在你电脑上直接算出 0 到 100 分，给 S / A / B / C / D 的等级，把分数拆成「忠实度 60 分」和「流畅度 40 分」，每扣一分都写清楚扣在哪（数字丢了、整段没翻、术语没按你批准的词、英文没翻干净、网址邮箱编号被弄丢，都会点名）；<b>🎛 风格简报</b>——按你上面选的「体裁调性」给一份 5 条的检查清单，翻译校对时照着走。全部在你电脑上算，不花钱</td></tr>
+           <tr><td><b>🔣 标点·书名号对账（v4.37 新）</b></td><td>一键本地体检（不花 token）：把原文和译文的书名号《》、括号、引号、问号、叹号、破折号、省略号逐个对账——漏标、多标、括号没闭合的硬伤全部标出。标点这种纯机械的错，AI 根本看不见、但编辑一眼就挑出来；本地数个数就能查，不花 token。只报可疑、以人工复核为准</td></tr>
+           <tr><td><b>📝 翻译腔体检（v4.38 新）</b></td><td>一键本地体检（不花 token）：查句末落「的」、「的」字堆叠、「作为…的东西」「被…所」这类日式/欧化翻译腔和套话直译——AI 改完还留的那股"翻译味儿"，本地正则就能揪出来。只报可疑、以人工复核为准</td></tr>
         </tbody>
       </table>
       <div class="alert i" style="margin-top:12px">
@@ -1765,6 +1770,8 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
           <tr><td><b>近期</b></td><td><b>术语权威分级</b>：词条分「待审 / 已批准」两种状态，校对只认已批准的译法；改动已批准译法需负责人再批一次</td><td>✅ 已上线（v4.32.0，专有译词库状态徽章 + 核查一键批准）</td></tr>
           <tr><td><b>近期</b></td><td><b>数字与格式体检</b>：数字丢失 / 凭空多出 / 百分号丢失 / 整段漏否定，逐处标出位置与上下文（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.33.0，工具组「🔢 数字体检」）</td></tr>
            <tr><td><b>近期</b></td><td><b>体检中心 + 译文总评分</b>：四项体检收一处、逐项可勾 + 一键全检；本地算 0–100 分（S/A/B/C/D）拆成忠实度 / 流畅度，逐条列出扣分项（含未翻译残留、占位符保护）；另有按体裁调性给的风格简报</td><td>✅ 已上线（v4.36.0，工具组「🩺 体检中心」）</td></tr>
+           <tr><td><b>近期</b></td><td><b>标点·书名号 1:1 机械对账</b>：书名号《》/括号/引号/问号/叹号/破折号/省略号，原文 vs 译文逐个对账，悬空括号与漏标多标直接标出（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.37.0，工具组「🔣 标点对账」）</td></tr>
+           <tr><td><b>近期</b></td><td><b>翻译腔体检</b>：句末落「的」、「的」密度、「作为…的东西/被…所」黑名单套话——揪出 AI 改完还留的翻译味儿（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.38.0，体检中心「📝 翻译腔体检」）</td></tr>
           <tr><td><b>云端版</b></td><td><b>改动留痕、可回溯</b>：每次重要校对留下不可篡改的备份点，谁改了什么、当时发生了什么都能查，不再靠猜</td><td>规划中</td></tr>
         </tbody>
       </table>

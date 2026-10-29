@@ -25,6 +25,12 @@ window.addEventListener('unhandledrejection', function(e){   /* v4.34.0：Promis
 /* ── v4.34.0 线上报错自动上报：有报错 → 立刻进反馈通道（线上 https 才发；本地无接口静默）→
    开发端看门狗每分钟巡检 /api/feedback/list，发现新条目就在 DSH 聊天框提醒 ── */
 let FB_AUTO_T = 0, FB_AUTO_SIG = '';
+/* 反馈接口地址（方案A）：真网页版（pages.dev，https）用同源 /api/feedback/*；插件/本地等
+   其它环境一律发到线上接口 https://transproof.pages.dev —— 这样朋友在插件里提交的反馈
+   也进同一份服务器日志。跨域已由反馈 Worker 的 Access-Control-Allow-Origin: * 放行。 */
+const FB_LIVE = 'https://transproof.pages.dev';
+const FB_ON_WEB = (location.protocol === 'https:' && location.hostname.endsWith('pages.dev'));
+const FB_BASE = FB_ON_WEB ? '' : FB_LIVE;
 function fbAutoReport(kind, msg){
   try{
     if(location.protocol !== 'https:') return;   /* 本地没有 /api 通道，不发 */
@@ -103,7 +109,7 @@ function fbCollect(){
 }
 
 async function fbPost(rec){
-  const r = await fetch('/api/feedback/submit', {
+  const r = await fetch(FB_BASE + '/api/feedback/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rec)
@@ -150,7 +156,7 @@ async function fbLoad(){
   if(!box) return;
   let remote = [];
   try{
-    const resp = await fetch('/api/feedback/list');
+    const resp = await fetch(FB_BASE + '/api/feedback/list');
     const j = await resp.json();
     remote = (j && j.list) || [];
   }catch(e){ /* 本地环境没有接口：只展示本地待发队列 */ }
@@ -190,4 +196,4 @@ function fbOpen(){
 $('#btn-fb') && ($('#btn-fb').onclick = fbOpen);
 $('#fb-refresh') && ($('#fb-refresh').onclick = fbLoad);
 /* 只有线上（https）自动拉列表；本地 http 环境不发请求，避免无谓报错 */
-if(location.protocol === 'https:') setTimeout(fbLoad, 600);
+setTimeout(fbLoad, 600);
