@@ -38,7 +38,7 @@ function applyPayload(p){
   }
   if(typeof p.prefs === 'string' && p.prefs){ PREFS = p.prefs; save(LS.prefs, PREFS); $('#prefs').value = PREFS; }
   if(p.options && typeof p.options === 'object'){
-    const map = {term:'c-term', note:'c-note', ext:'c-ext', format:'c-format', deai:'c-deai', ask:'c-ask'};
+    const map = {term:'c-term', note:'c-note', ext:'c-ext', format:'c-format', deai:'c-deai', ask:'c-ask', noun:'ts-c-noun'};
     for(const [k,id] of Object.entries(map)){
       if(p.options[k] !== undefined){ const el = $('#'+id); if(el){ el.checked = !!p.options[k]; } }
     }
@@ -160,6 +160,7 @@ function renderGloss(){
   renderCollections();
   renderGlossFilters();
   renderGlossTable();
+  if(typeof renderGvPanel === 'function') renderGvPanel();
   const has = GLOSS.terms.length > 0;
   $('#btn-g-export').disabled = !has;
   $('#btn-g-sync').disabled = !has;
@@ -320,7 +321,7 @@ function renderGlossTable(){
           (t.status !== 'rejected' ? '<button class="btn gray sm" data-toreject title="拒绝此条，不再注入提示词">✗ 拒绝</button>' : '') +
         '</div></td>' +
       '<td class="g-rec">' + recLabel + '</td>' +
-      '<td style="white-space:nowrap"><button class="btn gray sm" data-lookup title="联网查证通行译法">🔎</button> <button class="btn gray sm" data-verify title="AI 核查该条收录是否正确（v4.26.0）">🤖 核查</button> <button class="btn gray sm" data-edit>编辑</button> <button class="btn gray sm" data-merge1 title="把另一条合并进此条">⇄</button> <button class="btn gray sm" data-del title="删除此条">🗑</button></td>' +
+      '<td style="white-space:nowrap">' + (t.url ? '<a class="btn gray sm" href="' + esc(t.url) + '" target="_blank" rel="noopener" title="查看依据 URL">🔗</a> ' : '<button class="btn gray sm" data-gv-url2 title="回填依据 URL">🔗</button> ') + '<button class="btn gray sm" data-lookup title="联网查证通行译法">🔎</button> <button class="btn gray sm" data-verify title="AI 核查该条收录是否正确（v4.26.0）">🤖 核查</button> <button class="btn gray sm" data-edit>编辑</button> <button class="btn gray sm" data-merge1 title="把另一条合并进此条">⇄</button> <button class="btn gray sm" data-del title="删除此条">🗑</button></td>' +
       '</tr>';
   }).join('');
   // 行事件
@@ -334,6 +335,7 @@ function renderGlossTable(){
       renderGlossBatch();
     };
     tr.querySelector('[data-lookup]').onclick = () => glossLookup(id);
+    const bUrl2 = tr.querySelector('[data-gv-url2]'); if(bUrl2) bUrl2.onclick = () => { if(typeof gvSetUrl === 'function') gvSetUrl(t); };
     const bAp = tr.querySelector('[data-approve]'); if(bAp) bAp.onclick = () => glossSetStatus(id, 'confirmed');
     const bPd = tr.querySelector('[data-topend]'); if(bPd) bPd.onclick = () => glossSetStatus(id, 'pending');
     const bRj = tr.querySelector('[data-toreject]'); if(bRj) bRj.onclick = () => glossSetStatus(id, 'rejected');
@@ -446,6 +448,7 @@ function glossEdit(id){
       '<option value="pending" ' + (t.status==='pending'?'selected':'') + '>待审核</option>' +
       '<option value="confirmed" ' + (t.status==='confirmed'?'selected':'') + '>已确认</option>' +
       '<option value="rejected" ' + (t.status==='rejected'?'selected':'') + '>已拒绝</option></select></div>',
+    '<div style="margin-top:10px"><label class="f">依据 URL（证明这条译法的真链接，可留空）</label><input id="ge-url" value="' + esc(t.url||'') + '" placeholder="https://…"></div>',
     '<div style="margin-top:10px"><label class="f">备注</label><textarea id="ge-note" rows="2">' + esc(t.note||'') + '</textarea></div>',
     '<div style="margin-top:14px;display:flex;gap:8px"><button class="btn pri sm" id="ge-save">保存</button>' +
     '<button class="btn sm" id="ge-autotag">🏷 自动打标签</button>' +
@@ -458,6 +461,7 @@ function glossEdit(id){
     t.aliases = $('#ge-alias').value.split('\n').map(s => s.trim()).filter(Boolean);
     t.tags = $('#ge-tags').value.split(/[,，、]/).map(s => s.trim()).filter(Boolean);
     t.status = $('#ge-st').value;
+    t.url = normText($('#ge-url').value);
     t.note = $('#ge-note').value;
     t.updated = Date.now();
     saveGloss(); glossLog('edit', 'term:'+t.id, before, JSON.stringify({ zh:t.zh, foreign:t.foreign, status:t.status, recommend:t.recommend }));

@@ -944,6 +944,17 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
     </div>
   </div>
 
+  <div class="card" id="gv-card">
+    <h3>🔎 专名核验 <span class="hint">待审核词条：AI 核验 → 回填真 URL → 批准 → 一键统一全文（T-022）</span></h3>
+    <div class="body">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn sm" id="btn-gv-batch">🤖 AI 批量核验</button>
+        <button class="btn sm" id="btn-gv-unify" title="按「已批准」译名，把全文「中文（外文）」里的别名写法统一成批准译法">🔗 一键统一全文</button>
+      </div>
+      <div id="gv-list"></div>
+    </div>
+  </div>
+
   <div class="card" id="g-filter-card">
     <h3>词条管理 <span class="hint" id="g-count">0 条</span></h3>
     <div class="body">
@@ -1086,7 +1097,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
       </div>
 
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-        <button class="btn pri" id="ts-btn-run" style="padding:9px 22px">▶ 开始翻译</button>
+        <label class="chk" style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;font-size:13px;cursor:pointer"><input type="checkbox" id="ts-c-noun" checked style="width:auto"> 翻译后抽专名 + 建议译名入词库</label><button class="btn pri" id="ts-btn-run" style="padding:9px 22px">▶ 开始翻译</button>
         <button class="btn" id="btn-pipeline" title="三段流水线：翻译 → 批评 → 精修，一次操作自动串三次调用，每段产物你过目再进下一段（v4.29.0；v4.34.0 修好卡死：重试不越位、关弹窗能重开、中断立即生效）">⚙ 三段流水线</button>
         <button class="btn gray sm" id="ts-btn-stop" disabled>■ 中断</button>
         <span id="ts-runStat" style="font-size:12px;color:var(--tx3);align-self:center"></span>
@@ -1636,6 +1647,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
            <tr><td><b>🩺 体检中心 + 📊 译文总评分（v4.36 新）</b></td><td>工具组的「🩺 体检中心」把术语、专名、段落、数字这四项体检收在一起，每一项都能自己勾要不要做，点「▶ 一键体检」就出一张结果表，哪项有问题一眼看到，还能点「看细节」跳回原来那项。里面还有两个新东西：<b>📊 译文总评分</b>——在你电脑上直接算出 0 到 100 分，给 S / A / B / C / D 的等级，把分数拆成「忠实度 60 分」和「流畅度 40 分」，每扣一分都写清楚扣在哪（数字丢了、整段没翻、术语没按你批准的词、英文没翻干净、网址邮箱编号被弄丢，都会点名）；<b>🎛 风格简报</b>——按你上面选的「体裁调性」给一份 5 条的检查清单，翻译校对时照着走。全部在你电脑上算，不花钱</td></tr>
            <tr><td><b>🔣 标点·书名号对账（v4.37 新）</b></td><td>一键本地体检（不花 token）：把原文和译文的书名号《》、括号、引号、问号、叹号、破折号、省略号逐个对账——漏标、多标、括号没闭合的硬伤全部标出。标点这种纯机械的错，AI 根本看不见、但编辑一眼就挑出来；本地数个数就能查，不花 token。只报可疑、以人工复核为准</td></tr>
            <tr><td><b>📝 翻译腔体检（v4.38 新）</b></td><td>一键本地体检（不花 token）：查句末落「的」、「的」字堆叠、「作为…的东西」「被…所」这类日式/欧化翻译腔和套话直译——AI 改完还留的那股"翻译味儿"，本地正则就能揪出来。只报可疑、以人工复核为准</td></tr>
+           <tr><td><b>🔎 专名核验 + 术语表回填（v4.39 新）</b></td><td>翻译页勾「翻译后抽专名」，译完自动把专名和建议译名收进专有译词库（待审核）；译词库新面板「🔎 专名核验」里 AI 批量核验、人工回填真 URL 依据、一键批准，再「🔗 一键统一全文」把括号绑定的别名写法统一成批准译法。核验要调 AI（花 token），统一在你电脑本地完成</td></tr>
         </tbody>
       </table>
       <div class="alert i" style="margin-top:12px">
@@ -1772,6 +1784,7 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
            <tr><td><b>近期</b></td><td><b>体检中心 + 译文总评分</b>：四项体检收一处、逐项可勾 + 一键全检；本地算 0–100 分（S/A/B/C/D）拆成忠实度 / 流畅度，逐条列出扣分项（含未翻译残留、占位符保护）；另有按体裁调性给的风格简报</td><td>✅ 已上线（v4.36.0，工具组「🩺 体检中心」）</td></tr>
            <tr><td><b>近期</b></td><td><b>标点·书名号 1:1 机械对账</b>：书名号《》/括号/引号/问号/叹号/破折号/省略号，原文 vs 译文逐个对账，悬空括号与漏标多标直接标出（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.37.0，工具组「🔣 标点对账」）</td></tr>
            <tr><td><b>近期</b></td><td><b>翻译腔体检</b>：句末落「的」、「的」密度、「作为…的东西/被…所」黑名单套话——揪出 AI 改完还留的翻译味儿（在你电脑本地完成，不花钱）</td><td>✅ 已上线（v4.38.0，体检中心「📝 翻译腔体检」）</td></tr>
+           <tr><td><b>近期</b></td><td><b>专名核验 + 术语表回填</b>：翻译后自动抽专名入词库 → 面板里 AI 核验 + 真 URL 回填 + 批准 → 一键统一全文译法</td><td>✅ 已上线（v4.39.0，专有译词库「🔎 专名核验」）</td></tr>
           <tr><td><b>云端版</b></td><td><b>改动留痕、可回溯</b>：每次重要校对留下不可篡改的备份点，谁改了什么、当时发生了什么都能查，不再靠猜</td><td>规划中</td></tr>
         </tbody>
       </table>
@@ -1815,5 +1828,6 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 <script src="js/11-feedback.js"></script>
 <script src="js/12-editbox.js"></script>
 <script src="js/13-pipeline.js"></script>
+<script src="js/14-noun-verify.js"></script>
 </body>
 </html>
