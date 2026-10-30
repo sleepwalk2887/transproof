@@ -96,7 +96,7 @@ function esc(s) {
 
 function send(res, code, type, body) {
   try { if (res && typeof res.statusCode === 'number') res.statusCode = code; } catch (e) {}
-  try { if (res && typeof res.setHeader === 'function') res.setHeader('content-type', type); } catch (e) {}
+  try { if (res && typeof res.setHeader === 'function') { res.setHeader('content-type', type); res.setHeader('cache-control', 'no-cache, must-revalidate'); } } catch (e) {}
   if (res && typeof res.end === 'function') { res.end(body); return undefined; }
   if (res && typeof res.send === 'function') {
     try { if (typeof res.status === 'function') res.status(code); } catch (e) {}
