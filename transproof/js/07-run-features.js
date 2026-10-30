@@ -272,6 +272,7 @@ async function estimateQuality(){
     const { text } = await callModelSimple(EST_SYS, user, 900);
     const o = extractJsonObject(text);
     if(!o) throw new Error('未能解析预估结果');
+    window.TP_EST = o; // T-016：交付报告复用本次 AI 预估
     renderEstimate(o);
   }catch(err){
     toast('质量预估失败：' + err.message, 'e');

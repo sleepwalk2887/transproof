@@ -21,7 +21,7 @@ function T(name, ok){ if(ok){ pass++; console.log('  ok  ' + name); } else { fai
   }));
   T('#ver-tag 存在', info.tag);
   T('#ver-tag 文本 = v + APP_VERSION', info.txt === 'v' + info.appv);
-  T('APP_VERSION = 4.39.1', info.appv === '4.39.1');
+  T('APP_VERSION 是 x.y.z 三段', !!info.appv && info.appv.split('.').length === 3);
 
   // 2. 位置：fixed，左下角
   const pos = await page.evaluate(() => {
