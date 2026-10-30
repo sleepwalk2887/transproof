@@ -24,7 +24,7 @@ node run-all.js      # 全量 Playwright 测试（期望 PASS=29 FAIL=0）
 
 ## 硬性约定（违反 = 返工）
 1. **测试锚点**：不改按钮 id、八个标签页结构、测试断言依赖的文案
-2. **发版铁律**（用户规定）：功能更新 + 版本 bump 后必须 ①自检（`_check.js` + 全量 + bump 后复跑）②更新 `transproof/index.html` 的 `#p-help` 使用指南 ③更新 `乱风企划tips.md`（已上线表加行+计数）→ 然后才同步副本、发布
+2. **发版铁律**（用户规定）：功能更新 + 版本 bump 后必须 ①自检（`_check.js` + 全量 + bump 后复跑）②更新 `transproof/index.html` 的 `#p-help` 使用指南 ③更新 `乱风企划tips.md`（已上线表加行+计数）→ ④同步副本、发布 ⑤**发布后跑 `node _verify-release.js` 发版自检**（六副本版本/文件对齐 + tips/交接本镜像 + git 已推送 + 线上版本与脚本清单 = 本地，全绿才算插件端和网页端同时更新）
 3. **密钥不入库**：Cloudflare/API 凭证在 `~/.transproof-deploy/env`（本包不含），任何文件不得写入密钥
 4. **版本号**：`js/01-core.js` 第 2 行的 `APP_VERSION`（**不在 index.html**），bump 后必须复跑全量
 5. 用户是文科生，一切说明要「零基础能懂、白话、表格化」
