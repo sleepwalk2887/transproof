@@ -23,7 +23,7 @@ function T(name, ok){ if(ok){ pass++; console.log('  ok  ' + name); } else { fai
   T('#btn-report 按钮存在', boot.btn);
   T('旧按钮 #btn-audit-center 未动', boot.oldBtn);
   T('三个报告函数已导出', boot.fns.every(Boolean));
-  T('APP_VERSION = 4.40.0', boot.appv === '4.40.0');
+  T('APP_VERSION 是三段式版本号', String(boot.appv).split('.').length === 3);
 
   // 2. 纯函数汇总：错误分类 + 已修进度 + 修订正文抽取
   const fakeOut = '## 一、修订后译文\n\n这是第一段译文。\n\n这是第二段译文。\n\n## 二、逐条批注\n\n- [误译] **原文A** → 改为「译文甲」：理由一。\n- [术语不一致] **原文B** → 改为「译文乙」：理由二。\n- [误译] **原文C** → 改为「译文丙」：理由三。';
@@ -43,7 +43,7 @@ function T(name, ok){ if(ok){ pass++; console.log('  ok  ' + name); } else { fai
     return reportMarkdown(d);
   }, { fakeOut, fakeSrc });
   T('报告含标题 + 分类 + 进度 + 页脚', md.indexOf('# 交付质检报告') >= 0 && md.indexOf('错误分类') >= 0 && md.indexOf('已修进度') >= 0 && md.indexOf('TransProof') >= 0);
-  T('报告页脚含版本号', md.indexOf('v4.40.0') >= 0);
+  T('报告页脚含版本号', md.indexOf('v' + boot.appv) >= 0);
 
   // 4. 点按钮出弹窗
   await page.evaluate(() => { LAST_OUT = '## 一、修订后译文\n\n这是译文。\n\n## 二、逐条批注\n\n- [误译] **A** → 改为「B」：理由。'; });

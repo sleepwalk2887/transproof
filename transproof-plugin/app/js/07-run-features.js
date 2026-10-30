@@ -48,6 +48,13 @@ function buildSystem(){
       _ag.slice(0, 120).forEach(t => {
         L.push('· ' + t.foreign + ' → ' + t.zh + (t.type ? '（' + t.type + '）' : ''));
       });
+      const _agBrief = _ag.filter(t => t && t.brief);
+      if(_agBrief.length){
+        L.push('【已批准专名 · 背景速查】以下背景简介仅供理解语境，译名仍以上表锁定词条为准。');
+        _agBrief.slice(0, 10).forEach(t => {
+          L.push('· ' + t.foreign + ' → ' + t.zh + '：' + String(t.brief).slice(0, 120));
+        });
+      }
     }
   }
 

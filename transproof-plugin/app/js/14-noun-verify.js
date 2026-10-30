@@ -72,6 +72,7 @@ function renderGvPanel(){
           (t.note ? '<div style="font-size:11.5px;color:var(--tx3)">' + esc(t.note) + '</div>' : '') +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
+          '<button class="btn sm" data-gv-wiki="' + t.id + '">🔎 查维基</button>' +
           '<button class="btn sm" data-gv-verify="' + t.id + '">🤖 核验</button>' +
           urlBtn +
           '<button class="btn sm" data-gv-approve="' + t.id + '">✓ 批准</button>' +
@@ -107,6 +108,12 @@ function renderGvPanel(){
           return true;
         }
       });
+    };
+  });
+  box.querySelectorAll('[data-gv-wiki]').forEach(b => {
+    b.onclick = () => {
+      const t = GLOSS.terms.find(x => String(x.id) === String(b.dataset.gvWiki));
+      if(t && typeof gvWikiLookup === 'function') gvWikiLookup(t);
     };
   });
   box.querySelectorAll('[data-gv-url]').forEach(b => {
