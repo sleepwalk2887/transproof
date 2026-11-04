@@ -264,6 +264,7 @@ async function tsRun(){
     saveTask();
     // T-022 专名收集：译完自动抽专名 + 建议译名入词库（勾选了翻译页「翻译后抽专名」才做）
     if($('#ts-c-noun') && $('#ts-c-noun').checked && typeof tsCollectNouns === 'function') tsCollectNouns(src).catch(() => {});
+    if($('#ts-c-term') && $('#ts-c-term').checked && typeof tsCollectTerms === 'function') tsCollectTerms(src).catch(() => {});
     // 文档模式按钮：仅当原文是 docx 时启用
     if(TS_FILES.src && TS_FILES.src.kind === 'docx' && TS_FILES.src._zipBytes){
       $('#ts-btn-docout').disabled = false;

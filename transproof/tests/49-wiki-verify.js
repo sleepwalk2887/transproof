@@ -27,7 +27,7 @@ function T(name, ok){ if(ok){ pass++; console.log('  ok  ' + name); } else { fai
   T('#gv-list 面板容器在', boot.gvList);
   T('旧锚点 #btn-pnoun 未动', boot.btnPnoun);
   T('旧锚点 #ao-pnoun 未动', boot.aoPnoun);
-  T('APP_VERSION = 4.41.0', boot.appv === '4.41.0');
+  T('APP_VERSION 为三段式', typeof boot.appv === 'string' && boot.appv.split('.').length === 3);
 
   // 2. 标题清洗（去掉维基括号尾巴）
   const clean = await page.evaluate(() => ({

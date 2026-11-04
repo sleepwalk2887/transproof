@@ -47,6 +47,50 @@ async function tsCollectNouns(src){
   }
 }
 
+/* ── 新词/术语收集（T-024：一边译一边填术语表）── */
+const TS_COLLECT_TERM_SYS = '你是翻译项目的术语收集助手。从原文里抽「新术语 / 专业词 / 反复出现的关键词」（不限于专有名词），给一个通行的中文译名建议。宁可漏，不瞎编；不确定译名的条目不要输出。只输出 JSON 数组：[{"foreign":"外文原词","zh":"建议译名","type":"人物|概念|著作|学派|机构|事件|其他","note":"≤30字依据"}]，没有就输出 []。';
+
+async function tsCollectTerms(src){
+  src = String(src || '').trim();
+  if(!src){ return null; }
+  if(!CFG.apiKey){ toast('已跳过术语收集：设置里还没填模型 Key', 'w'); return null; }
+  const MAX = 12000;
+  const snippet = src.length > MAX ? src.slice(0, MAX) : src;
+  try{
+    const r = await callModelSimple(TS_COLLECT_TERM_SYS, '【原文】' + String.fromCharCode(10) + snippet, 1600);
+    const arr = extractJsonArray(r && r.text ? r.text : '');
+    if(!Array.isArray(arr) || !arr.length){ toast('术语收集：模型没有抽到新词', 'w'); return null; }
+    let sid = 's-trans-term';
+    if(!GLOSS.sources.find(s => s.id === sid)){
+      GLOSS.sources.push({ id: sid, name: '翻译术语收集', kind: 'trans', date: new Date().toISOString(), count: 0 });
+    }
+    let added = 0, skipped = 0;
+    for(const x of arr){
+      const foreign = normText(x.foreign || '');
+      const zh = normText(x.zh || '');
+      if(!foreign || !zh) continue;
+      if(GLOSS.terms.some(t => t.foreign && fKey(t.foreign) === fKey(foreign))){ skipped++; continue; }
+      GLOSS.terms.push({
+        id: GID++, zh: zh, foreign: foreign, aliases: [], type: guessType(zh, foreign),
+        tags: ['术语收集'], note: normText(x.note || ''), sources: [sid],
+        occurrences: [], collections: [], status: 'pending', recommend: '', url: '',
+        created: Date.now(), updated: Date.now()
+      });
+      added++;
+    }
+    const srcObj = GLOSS.sources.find(s => s.id === sid);
+    if(srcObj) srcObj.count += added;
+    saveGloss();
+    glossLog('collect', 'trans', null, { added: added, skipped: skipped });
+    if(typeof renderGloss === 'function') renderGloss();
+    toast('术语收集：新增 ' + added + ' 条到专有译词库（待审核）' + (skipped ? '，跳过重复 ' + skipped : '') + ' → 去「专有译词库」拍板');
+    return { added: added, skipped: skipped };
+  }catch(e){
+    toast('术语收集失败：' + errMsg(e), 'w');
+    return null;
+  }
+}
+
 /* ── 专名核验面板 ── */
 function gvPendingTerms(){
   return GLOSS.terms.filter(t => t && t.status === 'pending' && t.foreign && t.zh)
@@ -248,4 +292,5 @@ if($('#gv-list')) renderGvPanel();
 /* 测试与外部调用出口 */
 window.gvUnifyInText = gvUnifyInText;
 window.tsCollectNouns = tsCollectNouns;
+window.tsCollectTerms = tsCollectTerms;
 window.renderGvPanel = renderGvPanel;
