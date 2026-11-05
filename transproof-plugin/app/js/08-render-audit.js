@@ -397,6 +397,7 @@ function showCopyOptions(md){
     '</label>'
   ).join('');
   modal('复制结果（勾选要复制的段落）', [
+    (typeof citeBlockForDialog === 'function' ? citeBlockForDialog() : ''),
     '<div style="font-size:13px;color:var(--tx2);margin-bottom:10px">默认全选。取消勾选不需要的段落（如逐条批注、注释建议）即可只复制你想要的部分。</div>',
     '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><button class="btn sm gray" id="copy-all">全选</button><button class="btn sm gray" id="copy-none">全不选</button><button class="btn sm gray" id="copy-core">仅修订后译文</button></div>',
     '<div style="max-height:46vh;overflow:auto;border:1px solid var(--bd);border-radius:8px">' + checks + '</div>',
@@ -407,10 +408,12 @@ function showCopyOptions(md){
   $('#copy-all').onclick = () => sections.forEach((s, i) => { box(i).checked = true; });
   $('#copy-none').onclick = () => sections.forEach((s, i) => { box(i).checked = false; });
   $('#copy-core').onclick = () => sections.forEach((s, i) => { box(i).checked = /修订后译文|终稿|定稿/.test(s.title); });
+  if(typeof citeBindDialog === 'function'){ citeBindDialog(); }
   $('#copy-do').onclick = async () => {
     const picked = sections.filter((s, i) => box(i).checked);
     if(!picked.length){ toast('请至少勾选一段', 'w'); return; }
-    const text = picked.map(s => s.content).join('\n\n');
+    let text = picked.map(s => s.content).join('\n\n');
+    if(typeof citeBuildFromDialog === 'function'){ const h = citeBuildFromDialog(); if(h){ text = h + '\n\n' + text; } }
     try{ await navigator.clipboard.writeText(text); closeModal(); toast('已复制 ' + picked.length + ' 段（' + text.length + ' 字）'); }
     catch(e){ toast('复制失败，请手动选中文本', 'e'); }
   };
