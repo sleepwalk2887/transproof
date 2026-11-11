@@ -908,6 +908,19 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
       <span style="font-size:12px;color:var(--tx3);margin-left:10px" id="prefSaved"></span></div>
     </div>
   </div>
+
+  <div class="card" id="sp-card">
+    <h3>规范包 <span class="hint">外部「规范说明」文字包，可选启用，冲突以内置规则为准</span></h3>
+    <div class="body">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn pri sm" id="sp-import-text">📋 粘贴文本</button>
+        <button class="btn pri sm" id="sp-import-url">🔗 链接导入</button>
+        <button class="btn pri sm" id="sp-import-file">📂 选本地文件</button>
+      </div>
+      <div style="font-size:12px;color:var(--tx3);margin-bottom:10px">导入的是<b>纯文字说明</b>（如 skill 的 SKILL.md），只作为附加规范层注入提示词，<b>不执行任何脚本</b>。单包 ≤50KB、总数 ≤10。</div>
+      <div id="sp-list"></div>
+    </div>
+  </div>
 </div>
 </section>
 
@@ -1844,5 +1857,6 @@ Entfremdung | 异化 | 马克思；与 Verfremdung「间离」区分"></textarea
 <script src="js/15-delivery-report.js"></script>
 <script src="js/16-wiki-verify.js"></script>
 <script src="js/17-cite-header.js"></script>
+<script src="js/18-specpack.js"></script>
 </body>
 </html>

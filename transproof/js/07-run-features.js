@@ -69,6 +69,13 @@ function buildSystem(){
     PREFS.split(/[；;\n]/).map(s => s.trim()).filter(Boolean).forEach(s => L.push('· ' + s));
   }
 
+  // T-029：外部规范包（最低优先级，冲突以内置为准）
+  const _specBlock = (typeof specBlockForSystem === 'function') ? specBlockForSystem() : '';
+  if(_specBlock){
+    L.push('');
+    L.push(_specBlock);
+  }
+
   // 翻译记忆：命中历史定稿的句子，原样保留（跳过重翻，省 token）
   const memHits = findMemoryMatches($('#src').value);
   if(memHits.length){
