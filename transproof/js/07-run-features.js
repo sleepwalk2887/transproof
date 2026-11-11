@@ -56,6 +56,15 @@ function buildSystem(){
         });
       }
     }
+    // T-017：禁用译法（升为禁用后，下次请求禁止使用）
+    const _banned = (GLOSS.terms || []).filter(t => t && t.status === 'rejected' && t.recommend === 'ban' && t.foreign);
+    if(_banned.length){
+      L.push('');
+      L.push('【禁用译法】以下译法已被禁止，一律不要使用：');
+      _banned.slice(0, 60).forEach(t => {
+        L.push('· ' + t.foreign + (t.zh ? '（应译为「' + t.zh + '」）' : ''));
+      });
+    }
   }
 
   if($('#c-ext').checked){ L.push(''); L.push(TPL.extHeader); L.push(fill(TPL.ext, V)); }
