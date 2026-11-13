@@ -9,26 +9,47 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type,X-TP-App,X-TP-Ver,X-TP-Url,X-TP-UA,X-TP-Err'
 };
 
+function notifyText(p){
+  const a = [];
+  a.push('【TransProof 报错】');
+  if(p.id) a.push('编号: ' + p.id);
+  a.push('类型: ' + (p.type || 'manual'));
+  if(p.version) a.push('版本: ' + p.version);
+  if(p.page) a.push('页签: ' + p.page);
+  if(p.desc) a.push('描述: ' + p.desc);
+  return a.join(String.fromCharCode(10));
+}
+
 async function pushNotify(env, request){
   const url = env && env.NOTIFY_URL;
-  if(!url) return;                              /* 没配置静默跳过 */
+  if(!url) return;
   let payload = null;
   try{ payload = await request.clone().json(); }catch(e){ return; }
-  const body = JSON.stringify({
+  const p = {
     id: (payload && payload.id) || '',
     type: (payload && payload.type) || 'manual',
     version: (payload && payload.ver) || '',
     page: (payload && payload.page) || '',
     desc: String((payload && payload.desc) || '').slice(0, 200),
     ts: Date.now()
-  });
+  };
+  const text = notifyText(p);
+  const host = String(url).toLowerCase();
+  let body, ctype;
+  if(host.indexOf('ftqq.com') >= 0){
+    body = 'title=' + encodeURIComponent('TransProof 报错 ' + (p.id || '')) + '&desp=' + encodeURIComponent(text);
+    ctype = 'application/x-www-form-urlencoded';
+  }else{
+    body = JSON.stringify({ msgtype: 'text', text: { content: text } });
+    ctype = 'application/json';
+  }
   const send = function(){
     const ac = new AbortController();
-    const t = setTimeout(function(){ ac.abort(); }, 3000);  /* 3 秒超时 */
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, signal: ac.signal })
+    const t = setTimeout(function(){ ac.abort(); }, 3000);
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': ctype }, body: body, signal: ac.signal })
       .finally(function(){ clearTimeout(t); });
   };
-  try{ await send(); }catch(e){ try{ await send(); }catch(e2){} }   /* 最多重试 1 次，吞错 */
+  try{ await send(); }catch(e){ try{ await send(); }catch(e2){} }
 }
 
 export default {
