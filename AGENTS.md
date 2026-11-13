@@ -5,12 +5,12 @@
 
 ## 项目一句话
 TransProof（译校助手）：纯前端 AI 翻译校对工具，零后端零构建。`transproof/index.html` + `js/` 下 13 个 classic script（按序加载，`01-core` 第 2 行定义 `APP_VERSION`），外接大模型 API 干活，数据存浏览器 localStorage。
-线上：https://transproof.pages.dev （Cloudflare Pages）· 当前 **v4.38.1**（2026-10-30）· 测试 `node run-all.js` 共 45 个用例
+线上：https://transproof.pages.dev （Cloudflare Pages）· 版本与待办以《交接本.md》为准 · 测试 `node run-all.js`（用例数以交接本为准）
 
 ## 会话启动流程（每次新会话照做）
 1. 读 `HANDOFF.md` —— 架构、关键约定（**第八节是铁律**）、版本史、发版流程
 2. 读 `TASKS.md` —— 任务板，按优先级取第一个 `status: todo` 的任务开工
-3. 读 `transproof/乱风企划tips.md` —— 已上线 35 项总表 + 为什么做这些（Top 3）
+3. 读 `transproof/乱风企划tips.md` —— 功能进化总表（已上线数量以交接本为准） + 为什么做这些（Top 3）
 4. 需要历史背景时按需翻 `project-memory/`（最新在尾部日期）
 
 ## 常用命令（工作目录 `transproof/`）

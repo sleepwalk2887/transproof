@@ -102,5 +102,35 @@ if(!onlineHtml){
   T('线上脚本清单 = 本地', sameSet(scriptSrcs(read(path.join(MAIN, 'index.html'))), scriptSrcs(onlineHtml)));
 }
 
+
+// ── A3 机器闸门（T-036 文档防腐）──
+(function(){
+  function docVer(t){ const k='版本 **v'; const a=t.indexOf(k); if(a<0) return null; const b=a+k.length; const c=t.indexOf('**', b); return c>0 ? t.slice(b,c) : null; }
+  var f1a = ['交接本.md', 'transproof-collab/交接本.md'];
+  for (var i=0;i<f1a.length;i++){
+    var s1 = read(path.join(ORB, f1a[i])) || '';
+    var v1 = docVer(s1);
+    T('文档防腐：' + f1a[i] + ' 声明的版本 = 代码（' + v1 + '）', v1 === vMain);
+  }
+  var f1b = ['transproof-collab/HANDOFF.md', 'transproof-collab/AGENTS.md'];
+  for (var j=0;j<f1b.length;j++){
+    var s2 = read(path.join(ORB, f1b[j])) || '';
+    T('文档防腐：' + f1b[j] + ' 无独立版本声明', s2.indexOf('当前版本：') < 0);
+  }
+  var dw = read('C:/Users/Andrew/Documents/deepseek-harness/default-workspace/HANDOFF.md') || '';
+  T('文档防腐：default-workspace HANDOFF 已停止维护横幅', dw.indexOf('已停止维护') >= 0);
+  try{
+    var hb = read(path.join(ORB, '交接本.md')) || '';
+    var kd = '最后更新：**';
+    var da = hb.indexOf(kd);
+    var dm = null;
+    if(da >= 0){ var db = da + kd.length; var dc = hb.indexOf('**', db); if(dc > db) dm = hb.slice(db, dc); }
+    var tipsPath = path.join(ORB, 'transproof-collab', 'transproof', '乱风企划tips.md');
+    var tm = fs.statSync(tipsPath).mtime;
+    var p2 = function(x){ return String(x).padStart(2, '0'); };
+    var tmStr = tm.getFullYear() + '-' + p2(tm.getMonth()+1) + '-' + p2(tm.getDate());
+    T('文档防腐：交接本最后更新(' + dm + ') 不早于 tips mtime(' + tmStr + ')', (dm != null) && (dm >= tmStr));
+  }catch(e){ T('文档防腐：日期检查失败 ' + String(e.message).slice(0, 60), false); }
+})();
 console.log('===== 自检结果：通过 ' + pass + ' · 失败 ' + fail + ' · 警告 ' + warn + ' =====');
 process.exit(fail ? 1 : 0);
