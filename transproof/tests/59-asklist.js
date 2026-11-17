@@ -59,7 +59,7 @@ const { chromium } = require('playwright');
     LAST_OUT = '';
   });
   const md2 = await page.evaluate(() => window.askMarkdown());
-  t('空态四节都（无）', (md2.match(/（无）/g) || []).length === 4);
+  t('空态五节都（无）', (md2.match(/（无）/g) || []).length === 5);
 
   // 6. 无页面错误
   t('无页面错误', errors.length === 0);

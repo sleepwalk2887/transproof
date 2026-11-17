@@ -69,7 +69,7 @@ function T(name, ok){ if(ok){ pass++; console.log('  ok  ' + name); } else { fai
     return { has: !!promo, n: btns.length };
   });
   T('批注卡出现 .ef-promote 容器', dom.has);
-  T('批注卡有 3 个回流按钮', dom.n === 3);
+  T('批注卡有 4 个回流按钮（术语/禁用/文风/豁免）', dom.n === 4);
   T('无页面错误', pageErrors.length === 0 && consoleErrs.length === 0);
 
   await browser.close();
