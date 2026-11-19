@@ -47,6 +47,8 @@ project-memory/
 
 页面顶部 8 个页签：校对工作台 / 翻译工作台 / 项目进度 / 术语库 / 专有译词库 / Prompt库 / 设置 / 使用指南。
 
+> **L2-1 持久层抽象（v4.54）**：所有 `load()` / `save()` 都委托 `TP_STORE = { get(key, def), set(key, val) }`，默认实现 = localStorage（逐字节等价）。换云端只需实现同接口的 `TP_STORE` 并用 `tpUseStore()` 切换（`TP_STORE_MEM` 为内存实现，测试/临时用）；不动任何业务函数、键名、备份逻辑。
+
 | 函数 | 作用 |
 |---|---|
 | `run()` | 校对主流程（`extOnly`=仅术语延伸） |
